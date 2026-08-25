@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      1.0.0
+// @version      1.0.1
 // @description  用 LLM 把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/频道名会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -21,7 +21,7 @@
   const API_URL = localStorage.getItem("yfm_api_url") || "https://api.deepseek.com/chat/completions";
   const MODEL = localStorage.getItem("yfm_model") || "deepseek-chat";
   const BATCH_SIZE = 24;
-  const BATCH_WAIT_MS = 400;
+  const BATCH_WAIT_MS = 300;
   // ========================================
 
   const SYSTEM_PROMPT = `你是视频分类器。根据 YouTube 视频的标题和频道名（可能是任何语言），把每个视频分为四类之一：
@@ -199,8 +199,10 @@
   const onHome = () => location.pathname === "/";
   let inflight = 0;
   const queue = [];
+  // 并发上限必须 ≥ LLM 批量大小：每个任务都在等同一次批量请求返回，
+  // 上限过低会把实际批量压小（之前 6 并发导致每次 LLM 往返只带 6 条，吞吐砍到 1/4）
   function pump() {
-    while (inflight < 6 && queue.length) { inflight++; queue.shift()().finally(() => { inflight--; pump(); }); }
+    while (inflight < 32 && queue.length) { inflight++; queue.shift()().finally(() => { inflight--; pump(); }); }
   }
 
   const AD_SEL = "ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-display-ad-renderer, [class*=AdSlot]";
@@ -244,17 +246,29 @@
     document.querySelectorAll("ytd-rich-section-renderer").forEach(processSection);
     // 背压阀：过滤模式下被隐藏的卡不占高度，加载哨兵一直可见会让 YouTube 无限狂灌。
     // 待分类积压超过阈值时暂时隐藏哨兵（暂停加载），消化完再放开——也是对 YT 服务器的保护
+    const backlog = document.querySelectorAll('ytd-rich-item-renderer[data-yfm="pending"]').length;
     const cont = document.querySelector("ytd-continuation-item-renderer");
-    if (cont) {
-      const backlog = document.querySelectorAll('ytd-rich-item-renderer[data-yfm="pending"]').length;
-      cont.style.display = (mode !== "all" && backlog > 60) ? "none" : "";
-    }
+    if (cont) cont.style.display = (mode !== "all" && backlog > 60) ? "none" : "";
+    // 供给指示：过滤模式下有积压时给出反馈，把"等待"变成"可见的进行中"
+    hint.style.display = (mode !== "all" && backlog > 0) ? "block" : "none";
+    if (backlog > 0) hint.textContent = "AI 分类中… " + backlog + " 条待处理";
   }
+
+  const hint = document.createElement("div");
+  hint.style.cssText = "position:fixed;bottom:70px;left:24px;z-index:99998;display:none;padding:4px 12px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff;font-size:12px;";
+  document.body.appendChild(hint);
 
   // SPA 导航：离开首页时开关条隐藏含义不大，保留但只在首页生效过滤
   document.addEventListener("yt-navigate-finish", () => setTimeout(scan, 500));
   scan();
-  new MutationObserver(() => scan()).observe(document.body, { childList: true, subtree: true });
+  // DOM 变更合并调度：突发变更风暴下最多 300ms 扫一次
+  let scanScheduled = false;
+  const scheduleScan = () => {
+    if (scanScheduled) return;
+    scanScheduled = true;
+    setTimeout(() => { scanScheduled = false; scan(); }, 300);
+  };
+  new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
   setInterval(scan, 3000);
   window.__yfm = { cache, upRule, stats }; // 调试用
 })();

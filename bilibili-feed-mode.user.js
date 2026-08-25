@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站首页 娱乐/专业 模式切换
 // @namespace    leo.bilibili.feedmode
-// @version      1.0.1
+// @version      1.0.2
 // @description  用 LLM 把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换，可调"破茧"比例跳出信息茧房。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/UP名/标签会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与哔哩哔哩无关联。
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
@@ -281,8 +281,10 @@
   const matchMode = (cls, m) => m === "gent" ? cls === "good" : m === "ent" ? (cls === "ent" || cls === "good") : cls === m;
   let inflight = 0;
   const queue = [];
+  // 并发上限必须 ≥ LLM 批量大小：每个任务都在等同一次批量请求返回，上限过低会把实际批量压小、吞吐骤降。
+  // 对B站接口的保护由 biliFetch 全局串行节流承担，这里放开无风险
   function pump() {
-    while (inflight < 6 && queue.length) { inflight++; queue.shift()().finally(() => { inflight--; pump(); }); }
+    while (inflight < 32 && queue.length) { inflight++; queue.shift()().finally(() => { inflight--; pump(); }); }
   }
 
   // 注意嵌套层级 .feed-card > .bili-feed-card > .bili-video-card，必须隐藏最外层才能让网格补位
@@ -618,7 +620,11 @@
     const remaining = document.documentElement.scrollHeight - window.scrollY - innerHeight;
     if (remaining < 3200 || visInjected < 15) injectFromPool(10);
   }
-  window.addEventListener("scroll", maybeInject, { passive: true });
+  let lastScrollInject = 0;
+  window.addEventListener("scroll", () => { // 节流：真实滚轮每秒可触发数十次事件
+    const now = Date.now();
+    if (now - lastScrollInject > 250) { lastScrollInject = now; maybeInject(); }
+  }, { passive: true });
   setInterval(() => {
     if (mode === "all") return;
     // 后台标签页只做保底维持（低于最低水位才补），不做囤货，减少无人观看时的请求量
@@ -630,6 +636,13 @@
   window.__bfm = { get pool() { return pool; }, get mixPool() { return mixPool; }, shownBvids, cache, upRule, ensurePool, ensureMixPool, injectFromPool, stats,
     get backoff() { return { biliBackoffUntil, biliBackoffLevel, llmCooldownUntil, llmFailStreak, poolCooldownUntil, mixCooldownUntil }; } }; // 调试用
   scan();
-  new MutationObserver(() => scan()).observe(document.body, { childList: true, subtree: true });
+  // DOM 变更合并调度：突发变更风暴下最多 300ms 扫一次
+  let scanScheduled = false;
+  const scheduleScan = () => {
+    if (scanScheduled) return;
+    scanScheduled = true;
+    setTimeout(() => { scanScheduled = false; scan(); }, 300);
+  };
+  new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
   setInterval(scan, 3000); // 兜底：懒加载卡片链接就位后补扫
 })();
