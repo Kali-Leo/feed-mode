@@ -37,7 +37,9 @@
 ## 安装
 
 1. 安装用户脚本管理器：[Violentmonkey](https://violentmonkey.github.io/) 或 Tampermonkey
-2. 安装需要的脚本（`bilibili-feed-mode.user.js` 和/或 `youtube-feed-mode.user.js`）
+2. 一键安装脚本（Greasy Fork）：
+   - **B 站版** → https://greasyfork.org/zh-CN/scripts/592929
+   - **YouTube 版** → https://greasyfork.org/zh-CN/scripts/592932
 3. 打开对应网站首页，点击左下角开关条上的 **⚙**，填入你自己的 DeepSeek API Key（[platform.deepseek.com](https://platform.deepseek.com) 申请，费用自理；两个站点需各设置一次）
 4. 不填 Key 也能用：退回本地关键词规则分类（免费，但准确率明显更低）
 
