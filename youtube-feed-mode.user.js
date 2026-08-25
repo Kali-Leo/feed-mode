@@ -7,6 +7,8 @@
 // @grant        none
 // @run-at       document-idle
 // @license      GPL-3.0
+// @homepageURL  https://github.com/Kali-Leo/feed-mode
+// @supportURL   https://github.com/Kali-Leo/feed-mode/issues
 // ==/UserScript==
 // 本脚本为非官方社区工具。设计原则：不屏蔽广告、不劫持流量、不调用任何非页面自身的站内接口
 // （纯 DOM 过滤，补货完全依赖 YouTube 自己的无限滚动）。仅在首页生效。

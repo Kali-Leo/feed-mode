@@ -8,6 +8,8 @@
 // @grant        none
 // @run-at       document-idle
 // @license      GPL-3.0
+// @homepageURL  https://github.com/Kali-Leo/feed-mode
+// @supportURL   https://github.com/Kali-Leo/feed-mode/issues
 // ==/UserScript==
 // 本脚本为非官方社区工具，与哔哩哔哩无任何关联。设计原则：不屏蔽广告、不劫持流量、
 // 不损害平台与创作者权益。详见仓库 README 与 COMPLIANCE.md。
