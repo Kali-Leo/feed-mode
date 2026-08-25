@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      1.0.3
+// @version      1.2.0
 // @description  用 LLM 把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/频道名会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -21,19 +21,21 @@
   // API Key 通过左下角开关条上的 ⚙ 设置，仅存于你浏览器的 localStorage（youtube.com 域下）
   const API_KEY = (localStorage.getItem("yfm_api_key") || "").trim();
   const API_URL = localStorage.getItem("yfm_api_url") || "https://api.deepseek.com/chat/completions";
-  const MODEL = localStorage.getItem("yfm_model") || "deepseek-chat";
-  const BATCH_SIZE = 24;
+  const MODEL = localStorage.getItem("yfm_model") || "deepseek-v4-flash"; // 旧名 deepseek-chat 已于 2026-07 退役
+  const BATCH_SIZE = 40; // 批量越大，system prompt 摊得越薄
   const BATCH_WAIT_MS = 300;
   // ========================================
 
-  const SYSTEM_PROMPT = `你是视频分类器。根据 YouTube 视频的标题和频道名（可能是任何语言），把每个视频分为四类之一：
-- "pro"（专业）：真正有信息密度的内容——硬核知识科普、技术/编程/工程、财经与宏观分析、学术、深度纪录片、严肃的行业解读、高质量教学。判断标准是"看完能学到真东西"，且情绪基调必须冷静、克制、有建设性——看完是"搞懂了"而不是"更焦虑了"。以下内容即使话题专业也不算 pro：贩卖焦虑、渲染恐慌与灾难、煽动对立情绪、末日论调、阴谋论、"要崩盘/要完蛋"式的情绪化标题党分析——这类归 ent（若含营销引流则归 junk）。专业同样宁缺毋滥。
-- "good"（精选娱乐）：能带来优质情绪与情感价值的娱乐——治愈、温暖、纯粹的欢笑、才华与匠心（高水平创作、音乐、手艺、动画）、萌宠与自然、美食美景、真诚的生活记录、高质量的游戏/影视内容。判断标准是"看完心情变好：愉悦、感动或惊叹"。
-- "ent"（普通娱乐）：其他娱乐内容，尤其包括：制造对立/引战的话题、蹭热点骂战、猎奇审丑、擦边、狗血冲突、贩卖愤怒或焦虑的内容、无营养的快餐剪辑、标题党 clickbait。在 good 和 ent 之间拿不准时归 ent（精选宁缺毋滥）。
-- "junk"（营销水）：营销号、卖课/引流、贩卖焦虑的成功学、软广。
+  // 提示词与输入输出格式均为省 token 设计：输入用行式紧凑格式（不发 id），
+  // 输出用「序号→单字母」映射（输出 token 单价更高，压缩收益最大）
+  const SYSTEM_PROMPT = `你是视频分类器。输入为列表，每行一个 YouTube 视频（可能是任何语言），格式：序号|标题|频道名。把每个视频分为四类之一：
+- p（专业）：有信息密度、看完能学到真东西的内容——硬核知识科普、技术/编程/工程、财经与宏观分析、学术、深度纪录片、严肃行业解读、高质量教学，且情绪基调冷静克制、有建设性（看完是"搞懂了"而不是"更焦虑了"）。贩卖焦虑、渲染恐慌灾难、煽动对立、末日论调、阴谋论、"要崩盘/要完蛋"式情绪化标题党分析，即使话题专业也不算 p：归 e，含营销引流归 j。宁缺毋滥。
+- g（精选娱乐）：看完心情变好（愉悦、感动或惊叹）的娱乐——治愈、温暖、纯粹的欢笑、才华与匠心（高水平创作、音乐、手艺、动画）、萌宠自然、美食美景、真诚的生活记录、高质量游戏/影视。
+- e（普通娱乐）：其他娱乐，尤其是制造对立/引战的话题、蹭热点骂战、猎奇审丑、擦边、狗血冲突、贩卖愤怒或焦虑的内容、无营养的快餐剪辑、标题党 clickbait。g 和 e 之间拿不准归 e（精选宁缺毋滥）。
+- j（营销水）：营销号、卖课/引流、贩卖焦虑的成功学、软广。
 
-输入是 JSON 数组，每项有 id/title/up。若仅凭标题和频道名确实无法判断，可以输出 "?"。
-输出 JSON 对象：{"r": [{"id": "...", "c": "pro|good|ent|junk|?"}, ...]}，顺序与输入一致，不要输出其他内容。`;
+若仅凭标题和频道名确实无法判断，该行可给 "?"。
+输出 JSON：{"r":{"1":"p","2":"e",...}}，键为每行序号，值为 p/g/e/j/?，覆盖所有行，不要输出其他内容。`;
 
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
   const cache = load("yfm_cache", {});   // videoId -> 分类
@@ -84,6 +86,8 @@
     #yfm-switch button.on { background: #f00; color: #fff; }
     html[dark] #yfm-switch { background: rgba(40,40,40,.97); }
     html[dark] #yfm-switch button { color: #ddd; }
+    #yfm-tok { display: flex; align-items: center; padding: 0 6px; color: #909090;
+      font-size: 11px; white-space: nowrap; }
   `;
   document.head.appendChild(style);
 
@@ -115,6 +119,41 @@
   };
   sw.appendChild(cfgBtn);
   document.body.appendChild(sw);
+
+  // ---------- token 计量（纯观测，不干预请求）：逐请求累计 API 返回的 usage，精确值非估算 ----------
+  // deepseek-v4-flash 价目（元/百万token，≈美元价×7.2）；高峰时段（UTC 1-4 与 6-10 点）价格×2
+  const PRICE = { hit: 0.05, miss: 1.58, out: 4.75 };
+  const priceFactor = () => { const h = new Date().getUTCHours(); return (h >= 1 && h < 4) || (h >= 6 && h < 10) ? 2 : 1; };
+  const tok = load("yfm_tok", { in: 0, hit: 0, out: 0, req: 0, c: 0, day: "", dIn: 0, dHit: 0, dOut: 0, dC: 0 });
+  const tokDayStr = () => { const t = new Date(); return t.getFullYear() + "-" + (t.getMonth() + 1) + "-" + t.getDate(); };
+  const tokRoll = () => { const d = tokDayStr(); if (tok.day !== d) { tok.day = d; tok.dIn = tok.dHit = tok.dOut = 0; tok.dC = 0; } };
+  const tokDayUsed = () => { tokRoll(); return tok.dIn + tok.dOut; };
+  const fmtTok = (n) => n >= 1e8 ? (n / 1e8).toFixed(2) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n);
+  function addUsage(u) {
+    if (!u) return;
+    tokRoll();
+    const hit = u.prompt_cache_hit_tokens ?? (u.prompt_tokens_details && u.prompt_tokens_details.cached_tokens) ?? 0;
+    const miss = (u.prompt_tokens || 0) - hit, out = u.completion_tokens || 0;
+    const cost = (miss * PRICE.miss + hit * PRICE.hit + out * PRICE.out) * priceFactor() / 1e6; // 按当下峰谷时段计价
+    tok.in += u.prompt_tokens || 0; tok.out += out; tok.hit += hit; tok.req++;
+    tok.c = (tok.c || 0) + cost;
+    tok.dIn += u.prompt_tokens || 0; tok.dOut += out; tok.dHit += hit;
+    tok.dC = (tok.dC || 0) + cost;
+    localStorage.setItem("yfm_tok", JSON.stringify(tok));
+    tokRender();
+  }
+  const tokChip = document.createElement("span");
+  tokChip.id = "yfm-tok";
+  function tokRender() {
+    tokRoll();
+    tokChip.textContent = "今日" + fmtTok(tokDayUsed()) + "tok";
+    tokChip.title = "本站 LLM 用量（逐请求累计 API 返回的 usage）\n" +
+      "今日：输入 " + fmtTok(tok.dIn) + "（缓存命中 " + fmtTok(tok.dHit) + "）+ 输出 " + fmtTok(tok.dOut) +
+      " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
+      "累计：" + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " 次请求 ≈ ¥" + (tok.c || 0).toFixed(2);
+  }
+  if (API_KEY) { sw.appendChild(tokChip); tokRender(); }
+
   function setMode(m) {
     mode = m;
     localStorage.setItem("yfm_mode", m);
@@ -151,7 +190,13 @@
     const items = batch.splice(0);
     if (!items.length) return;
     if (Date.now() < llmCooldownUntil) { for (const it of items) it.resolve(null); return; }
-    const payload = items.map(it => ({ id: it.id, title: it.title, up: it.owner }));
+    // 行式紧凑输入：序号|标题|频道名。不发 id（11 位视频 id 要吃约 8 个 token 且要被回显）
+    const clean = (s) => String(s || "").replace(/[|\n]/g, " ").trim();
+    const payload = items.map((it, i) =>
+      (i + 1) + "|" + clean(it.title).slice(0, 80) + "|" + clean(it.owner)
+    ).join("\n");
+    // 兼容模型偶发输出全称或数组格式
+    const CODE = { p: "pro", g: "good", e: "ent", j: "junk", "?": "?", pro: "pro", good: "good", ent: "ent", junk: "junk" };
     let map = null;
     for (let attempt = 0; attempt < 2 && !map; attempt++) {
       stats.llmReq++;
@@ -160,19 +205,29 @@
           method: "POST",
           headers: { "content-type": "application/json", "authorization": "Bearer " + API_KEY },
           body: JSON.stringify({
-            model: MODEL, max_tokens: 2000,
+            model: MODEL, max_tokens: 500,
+            // v4-flash 默认开思考模式，reasoning token 按输出计费，分类任务必须显式关闭
+            ...(MODEL.startsWith("deepseek") ? { thinking: { type: "disabled" } } : {}),
             response_format: { type: "json_object" },
             messages: [
               { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: JSON.stringify(payload) },
+              { role: "user", content: payload },
             ],
           }),
         });
         const d = await r.json();
+        addUsage(d.usage); // 精确计量：直接累计 API 返回的 usage
         if (!d.choices) throw new Error("api error: " + JSON.stringify(d).slice(0, 120));
         const out = JSON.parse(d.choices[0].message.content);
+        const raw = out.r ?? out;
+        const entries = Array.isArray(raw)
+          ? raw.map((v, i) => [i, v])
+          : Object.entries(raw || {}).map(([k, v]) => [parseInt(k, 10) - 1, v]);
         map = {};
-        for (const it of (out.r || [])) if (["pro","good","ent","junk","?"].includes(it.c)) map[it.id] = it.c;
+        for (const [idx, v] of entries) {
+          const c = CODE[String(v && v.c !== undefined ? v.c : v).trim()];
+          if (Number.isInteger(idx) && idx >= 0 && idx < items.length && c) map[items[idx].id] = c;
+        }
       } catch (e) {
         console.warn("[yfm] LLM 分类失败(第" + (attempt + 1) + "次):", e);
         if (attempt === 0) await new Promise(res => setTimeout(res, 2500));
