@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站首页 娱乐/专业 模式切换
 // @namespace    leo.bilibili.feedmode
-// @version      1.0.2
+// @version      1.0.3
 // @description  用 LLM 把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换，可调"破茧"比例跳出信息茧房。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/UP名/标签会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与哔哩哔哩无关联。
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
@@ -27,7 +27,7 @@
   // ========================================
 
   const SYSTEM_PROMPT = `你是B站视频分类器。根据视频的标题、UP主名和标签，把每个视频分为四类之一：
-- "pro"（专业）：真正有信息密度的内容——硬核知识科普、技术/编程/工程、财经与宏观分析、学术、深度纪录片、严肃的行业解读、高质量教学。判断标准是"看完能学到真东西"。
+- "pro"（专业）：真正有信息密度的内容——硬核知识科普、技术/编程/工程、财经与宏观分析、学术、深度纪录片、严肃的行业解读、高质量教学。判断标准是"看完能学到真东西"，且情绪基调必须冷静、克制、有建设性——看完是"搞懂了"而不是"更焦虑了"。以下内容即使话题专业也不算 pro：贩卖焦虑、渲染恐慌与灾难、煽动对立情绪、末日论调、阴谋论、"要崩盘/要完蛋/劲爆"式的情绪化标题党分析——这类归 ent（若含营销引流则归 junk）。专业同样宁缺毋滥。
 - "good"（精选娱乐）：能带来优质情绪与情感价值的娱乐——治愈、温暖、纯粹的欢笑、才华与匠心（高水平创作、音乐、手艺、动画）、萌宠与自然、美食美景、真诚的生活记录、高质量的游戏/影视内容。判断标准是"看完心情变好：愉悦、感动或惊叹"。
 - "ent"（普通娱乐）：其他娱乐内容，尤其包括：制造对立/引战/吵架的话题、蹭热点骂战、猎奇审丑、擦边、狗血冲突、贩卖愤怒或焦虑的社会新闻、无营养的快餐剪辑。在 good 和 ent 之间拿不准时归 ent（精选宁缺毋滥）。
 - "junk"（营销水）：营销号、卖课/引流（"私信领资料""训练营""副业月入"类）、贩卖焦虑的成功学、标题党软广、水内容。
@@ -43,6 +43,11 @@
   if (localStorage.getItem("bfm_cache_v") !== "2") { // v2 引入精选娱乐：旧的 ent 里可能藏着 good，清掉重判
     for (const k of Object.keys(cache)) if (cache[k] === "ent") delete cache[k];
     localStorage.setItem("bfm_cache_v", "2");
+  }
+  if (localStorage.getItem("bfm_cache_v") !== "3") { // v3 专业模式加入情绪门槛：旧的 pro 按新标准重判
+    for (const k of Object.keys(cache)) if (cache[k] === "pro") delete cache[k];
+    sessionStorage.removeItem("bfm_pool"); // 缓冲池里的旧标准存货一并作废
+    localStorage.setItem("bfm_cache_v", "3");
   }
   const upRule = load(LS.up, {});     // UP主名 -> 分类 (Shift+点角标写入)
   if (Object.keys(cache).length > 5000) { for (const k of Object.keys(cache).slice(0, 2500)) delete cache[k]; }

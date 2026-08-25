@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      1.0.2
+// @version      1.0.3
 // @description  用 LLM 把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/频道名会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -25,7 +25,7 @@
   // ========================================
 
   const SYSTEM_PROMPT = `你是视频分类器。根据 YouTube 视频的标题和频道名（可能是任何语言），把每个视频分为四类之一：
-- "pro"（专业）：真正有信息密度的内容——硬核知识科普、技术/编程/工程、财经与宏观分析、学术、深度纪录片、严肃的行业解读、高质量教学。判断标准是"看完能学到真东西"。
+- "pro"（专业）：真正有信息密度的内容——硬核知识科普、技术/编程/工程、财经与宏观分析、学术、深度纪录片、严肃的行业解读、高质量教学。判断标准是"看完能学到真东西"，且情绪基调必须冷静、克制、有建设性——看完是"搞懂了"而不是"更焦虑了"。以下内容即使话题专业也不算 pro：贩卖焦虑、渲染恐慌与灾难、煽动对立情绪、末日论调、阴谋论、"要崩盘/要完蛋"式的情绪化标题党分析——这类归 ent（若含营销引流则归 junk）。专业同样宁缺毋滥。
 - "good"（精选娱乐）：能带来优质情绪与情感价值的娱乐——治愈、温暖、纯粹的欢笑、才华与匠心（高水平创作、音乐、手艺、动画）、萌宠与自然、美食美景、真诚的生活记录、高质量的游戏/影视内容。判断标准是"看完心情变好：愉悦、感动或惊叹"。
 - "ent"（普通娱乐）：其他娱乐内容，尤其包括：制造对立/引战的话题、蹭热点骂战、猎奇审丑、擦边、狗血冲突、贩卖愤怒或焦虑的内容、无营养的快餐剪辑、标题党 clickbait。在 good 和 ent 之间拿不准时归 ent（精选宁缺毋滥）。
 - "junk"（营销水）：营销号、卖课/引流、贩卖焦虑的成功学、软广。
@@ -35,6 +35,10 @@
 
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
   const cache = load("yfm_cache", {});   // videoId -> 分类
+  if (localStorage.getItem("yfm_cache_v") !== "2") { // v2 专业模式加入情绪门槛：旧的 pro 按新标准重判
+    for (const k of Object.keys(cache)) if (cache[k] === "pro") delete cache[k];
+    localStorage.setItem("yfm_cache_v", "2");
+  }
   const upRule = load("yfm_up", {});     // 频道名 -> 分类（预留）
   if (Object.keys(cache).length > 5000) { for (const k of Object.keys(cache).slice(0, 2500)) delete cache[k]; }
   let saveTimer = null;
