@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站首页 娱乐/专业 模式切换
 // @namespace    leo.bilibili.feedmode
-// @version      2.0.0
+// @version      2.0.1
 // @description  内置本地 AI 小模型 + 大模型复核，把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（费用极低且实时显示，「容忍」滑条可控制用量）。不屏蔽任何广告与商业内容。非官方工具，与哔哩哔哩无关联。
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
@@ -226,7 +226,7 @@
     if (inp === null) return;
     localStorage.setItem("bfm_api_key", inp.trim());
     alert(inp.trim()
-      ? "已保存，刷新页面生效。\n\n费用参考（实测）：连续刷全新内容约每千条视频 2 分钱；\n使用约一周后，随本地缓存积累与端上小模型自适应，日常降至每千条 1 分钱以下。\n开关条上的「容忍」滑条可进一步控制 AI 用量（越高越省）。"
+      ? "已保存，刷新页面生效。\n\n费用参考（实测）：连续刷全新内容约每千条视频 2 分钱；\n已分类内容有本地缓存，重复出现不再计费。\n开关条上的「容忍」滑条可进一步控制 AI 用量（越高越省）。"
       : "已清除 Key。本地小模型仍支撑「专业」模式主要功能，精选娱乐改用关键词规则。刷新页面生效。");
   };
   sw.appendChild(cfgBtn);
@@ -263,7 +263,7 @@
       "今日：输入 " + fmtTok(tok.dIn) + "（缓存命中 " + fmtTok(tok.dHit) + "）+ 输出 " + fmtTok(tok.dOut) +
       " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
       "累计：" + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " 次请求 ≈ ¥" + (tok.c || 0).toFixed(2) + "\n" +
-      "参考：千条新视频约 2 分钱；使用一周后随缓存与本地自适应约降至一半以下";
+      "参考：千条全新视频约 2 分钱；重复内容命中本地缓存不再计费";
   }
   if (API_KEY) { sw.appendChild(tokChip); tokRender(); }
 
