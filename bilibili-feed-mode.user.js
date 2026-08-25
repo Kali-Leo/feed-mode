@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站首页 娱乐/专业 模式切换
 // @namespace    leo.bilibili.feedmode
-// @version      1.0.0
+// @version      1.0.1
 // @description  用 LLM 把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换，可调"破茧"比例跳出信息茧房。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/UP名/标签会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与哔哩哔哩无关联。
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
@@ -97,23 +97,11 @@
       cursor: pointer; color: #61666d; font-size: 13px;
     }
     #bfm-switch button.on { background: #00aeec; color: #fff; }
-    .bfm-badge {
-      position: absolute; top: 6px; left: 6px; z-index: 5;
-      min-width: 20px; height: 20px; line-height: 20px; text-align: center;
-      border-radius: 4px; font-size: 12px; color: #fff; cursor: pointer;
-      opacity: .85; padding: 0 4px;
-    }
-    .bfm-badge[data-c="pro"] { background: #2f6fed; }
-    .bfm-badge[data-c="good"] { background: #ec4899; } /* 精选娱乐 */
-    .bfm-badge[data-src="mix"] { background: #0d9488; } /* 破茧来源的"专"用青绿色区分 */
     #bfm-mix { display: none; align-items: center; gap: 4px; padding: 0 6px 0 10px;
       border-left: 1px solid #e3e5e7; margin-left: 4px; color: #61666d; font-size: 12px; }
     html[data-bfm-mode="pro"] #bfm-mix { display: flex; }
     #bfm-mix input { width: 70px; accent-color: #0d9488; }
     #bfm-mix b { min-width: 30px; font-weight: normal; }
-    .bfm-badge[data-c="ent"] { background: #ff7f24; }
-    .bfm-badge[data-c="junk"] { background: #8b5cf6; }
-    .bfm-badge[data-c="unk"] { background: rgba(0,0,0,.45); }
   `;
   document.head.appendChild(style);
 
@@ -289,7 +277,6 @@
   }
 
   // ---------- 卡片处理 ----------
-  const BADGE_TXT = { pro: "专", good: "优", ent: "娱", junk: "水", unk: "?" };
   // 某分类在某模式下是否该显示
   const matchMode = (cls, m) => m === "gent" ? cls === "good" : m === "ent" ? (cls === "ent" || cls === "good") : cls === m;
   let inflight = 0;
@@ -301,30 +288,8 @@
   // 注意嵌套层级 .feed-card > .bili-feed-card > .bili-video-card，必须隐藏最外层才能让网格补位
   const wrapOf = (card) => card.closest(".feed-card") || card.closest(".bili-feed-card") || card;
 
-  function addBadge(card, cls, bvid, owner) {
-    let badge = card.querySelector(".bfm-badge");
-    if (!badge) {
-      badge = document.createElement("div");
-      badge.className = "bfm-badge";
-      badge.title = "点击: 循环纠正分类(专→优→娱)\nShift+点击: 记住该UP主的分类";
-      const cover = card.querySelector(".bili-video-card__image, .bili-video-card__cover") || card;
-      if (getComputedStyle(cover).position === "static") cover.style.position = "relative";
-      cover.appendChild(badge);
-      badge.onclick = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const order = ["pro", "good", "ent"];
-        const next = order[(order.indexOf(badge.dataset.c) + 1) % order.length];
-        if (e.shiftKey && owner) upRule[owner] = next; else cache[bvid] = next;
-        save();
-        setCls(card, next, bvid, owner);
-      };
-    }
-    badge.dataset.c = cls;
-    badge.textContent = BADGE_TXT[cls] || "?";
-  }
-  function setCls(card, cls, bvid, owner) {
+  function setCls(card, cls) {
     wrapOf(card).dataset.bfm = cls;
-    addBadge(card, cls, bvid, owner);
   }
 
   function processCard(card) {
@@ -569,8 +534,6 @@
         template = (fc.querySelector(".bili-feed-card") || fc).cloneNode(true);
         template.querySelectorAll("[data-bfm], [data-bfm-seen]").forEach(e => { delete e.dataset.bfm; delete e.dataset.bfmSeen; });
         delete template.dataset.bfm;
-        const b = template.querySelector(".bfm-badge");
-        if (b) b.remove();
         break;
       }
     }
@@ -609,7 +572,6 @@
     el.dataset.bfmInjected = "1";
     const card = el.querySelector(".bili-video-card") || el;
     card.dataset.bfmSeen = "1";
-    addBadge(card, p.cls, it.bvid, owner);
     return el;
   }
 
@@ -641,10 +603,6 @@
     for (const p of picks) {
       shownBvids.add(p.item.bvid);
       const el = buildCard(p);
-      if (p.src === "mix") {
-        const b = el.querySelector(".bfm-badge");
-        if (b) { b.dataset.src = "mix"; b.title = "圈外精选（破茧内容）\n" + b.title; }
-      }
       cont.appendChild(el); // 只追加到末尾，绝不插入中间
     }
     if (picks.length) persistPool();
