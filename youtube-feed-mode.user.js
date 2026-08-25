@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      1.0.1
+// @version      1.0.2
 // @description  用 LLM 把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/频道名会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -252,6 +252,22 @@
     // 供给指示：过滤模式下有积压时给出反馈，把"等待"变成"可见的进行中"
     hint.style.display = (mode !== "all" && backlog > 0) ? "block" : "none";
     if (backlog > 0) hint.textContent = "AI 分类中… " + backlog + " 条待处理";
+    // 推荐流耗尽（YT 移除了加载哨兵，一次会话的推荐配额有限，过滤模式消耗更快）：
+    // 在流末尾提供"换一批"卡片，刷新即获得全新一轮推荐（分类缓存在，老视频零成本）
+    const grid = document.querySelector("ytd-rich-grid-renderer #contents");
+    let btn = document.getElementById("yfm-refresh");
+    if (grid && !cont && mode !== "all" && backlog === 0) {
+      if (!btn) {
+        btn = document.createElement("div");
+        btn.id = "yfm-refresh";
+        btn.textContent = "本轮推荐已刷完 · 点击换一批新推荐";
+        btn.style.cssText = "grid-column:1/-1;width:100%;padding:28px 0;margin:8px 0 40px;text-align:center;font-size:15px;color:#fff;background:#f00;border-radius:12px;cursor:pointer;";
+        btn.onclick = () => location.reload();
+      }
+      if (btn.parentElement !== grid || btn !== grid.lastElementChild) grid.appendChild(btn);
+    } else if (btn) {
+      btn.remove();
+    }
   }
 
   const hint = document.createElement("div");
