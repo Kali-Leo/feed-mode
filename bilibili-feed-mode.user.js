@@ -517,8 +517,8 @@
   // 破茧比例滑条（仅专业模式显示）
   const mixUI = document.createElement("div");
   mixUI.id = "bfm-mix";
-  mixUI.title = "注入卡片中「圈外精选」的占比：0% 纯个性化推荐，100% 全是打破信息茧房的分区精选";
-  mixUI.innerHTML = '<span>破茧</span><input type="range" min="0" max="100" step="10"><b></b>';
+  mixUI.title = "注入卡片中「热榜内容」的占比：0% 纯个性化推荐，100% 全是来自知识/科技分区和全站热门的圈外精选";
+  mixUI.innerHTML = '<span>热榜内容</span><input type="range" min="0" max="100" step="10"><b></b>';
   sw.appendChild(mixUI);
   const mixInput = mixUI.querySelector("input"), mixLabel = mixUI.querySelector("b");
   mixInput.value = mixRatio;
