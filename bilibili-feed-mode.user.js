@@ -7,6 +7,7 @@
 // @description:en  Filter your Bilibili home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box - no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with Bilibili.
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
+// @match        https://www.bilibili.com/video/*
 // @grant        none
 // @run-at       document-idle
 // @license      GPL-3.0
@@ -19,6 +20,91 @@
 (function () {
   "use strict";
   if (window.__bfm) return; // 防止重复注入
+
+  // ================= 个人兴趣模型回传（默认关闭） =================
+  // 只有在开关条的 🔗 里填了连接码，下面这些才会做事；没填时全部空转，脚本行为与不带此功能时一致。
+  // 目标固定为本机 127.0.0.1 的兴趣服务（interest-model/daemon），发的是标题、UP主名、视频 id、
+  // 封面地址、观看时长；不发 Cookie、不发账号、不发任何身份信息，也不发往本机以外的任何地方。
+  const IM_URL = "http://127.0.0.1:21456/events";
+  const IM_TOKEN = (localStorage.getItem("bfm_im_token") || "").trim();
+  const imQueue = [];
+  let imTimer = null;
+  function imFlush() {
+    imTimer = null;
+    if (!IM_TOKEN || !imQueue.length) return;
+    const batch = imQueue.splice(0, 200);
+    fetch(IM_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-IM-Token": IM_TOKEN },
+      body: JSON.stringify(batch),
+      keepalive: true,
+    }).catch(() => {}); // 本机服务没开就静默丢弃，不打扰用户
+  }
+  function imReport(ev) {
+    if (!IM_TOKEN) return;
+    ev.site = "bilibili";
+    ev.ts = Date.now() / 1000;
+    imQueue.push(ev);
+    if (!imTimer) imTimer = setTimeout(imFlush, 5000);
+  }
+  const imCover = (card) => {
+    const img = card.querySelector("img");
+    return img && img.src ? img.src.split("@")[0].replace(/^https?:/, "https:") : "";
+  };
+
+  // 视频页只做一件事：这次看了多久。没填连接码就到此为止，整段不运行。
+  if (/^\/video\//.test(location.pathname)) {
+    if (!IM_TOKEN) return;
+    const bvid = (location.pathname.match(/BV[0-9A-Za-z]{10}/) || [])[0];
+    if (!bvid) return;
+    let watched = 0, lastTick = Date.now(), counting = !document.hidden;
+    const tick = () => {
+      const now = Date.now();
+      if (counting) watched += (now - lastTick) / 1000;
+      lastTick = now;
+    };
+    setInterval(tick, 5000);
+    const send = () => {
+      tick();
+      if (watched < 5) return; // 打开就关掉的不算看过
+      const v = document.querySelector("video");
+      const h1 = document.querySelector("h1.video-title, h1[title]");
+      const up = document.querySelector(".up-name, a.up-name, .username");
+      imReport({
+        type: "watch", id: bvid,
+        t: ((h1 && (h1.getAttribute("title") || h1.textContent)) || document.title.replace(/_哔哩哔哩.*$/, "")).trim(),
+        u: (up && up.textContent || "").trim(),
+        pic: "", dwell: Math.round(watched), dur: v && v.duration ? Math.round(v.duration) : 0,
+      });
+      imFlush();
+      watched = 0;
+    };
+    document.addEventListener("visibilitychange", () => {
+      tick();
+      counting = !document.hidden;
+      if (document.hidden) send();
+    });
+    window.addEventListener("pagehide", send);
+    return;
+  }
+
+  // 首页上点开一个视频，记一次「选择」（曝光在卡片处理里记）
+  document.addEventListener("click", (e) => {
+    if (!IM_TOKEN || !e.target.closest) return;
+    const a = e.target.closest('a[href*="/video/BV"]');
+    if (!a) return;
+    const id = (a.href.match(/BV[0-9A-Za-z]{10}/) || [])[0];
+    if (!id) return;
+    const card = a.closest(".bili-video-card") || a;
+    const t = card.querySelector(".bili-video-card__info--tit");
+    const o = card.querySelector(".bili-video-card__info--author, .bili-video-card__info--owner");
+    imReport({
+      type: "click", id,
+      t: ((t && (t.getAttribute("title") || t.textContent)) || "").trim(),
+      u: ((o && o.textContent) || "").trim().split("\n")[0].replace(/\s*·.*$/, ""),
+      pic: imCover(card), dwell: 0, dur: 0,
+    });
+  }, true);
 
   // ================= 配置 =================
   // API Key 通过页面左下角开关条上的 ⚙ 按钮设置，仅保存在你自己浏览器的 localStorage 中，
@@ -239,6 +325,30 @@
             : "Key removed. The built-in local model still powers Learn mode; finer modes fall back to keyword rules. Reload to apply."));
   };
   sw.appendChild(cfgBtn);
+  // 连接码：填了才把浏览记录交给本机的兴趣程序，留空 = 这个功能完全不存在
+  const imBtn = document.createElement("button");
+  imBtn.textContent = "🔗";
+  imBtn.title = ZH ? "连接码（本机兴趣程序）" : "Connection code (local interest service)";
+  imBtn.onclick = () => {
+    const cur = localStorage.getItem("bfm_im_token") || "";
+    const inp = prompt(ZH
+      ? "粘贴本机兴趣程序的连接码（程序启动时会打印，也可以在 Breadcrumb 的发现页上复制）。\n\n" +
+        "填好之后，脚本会把你在B站看到和点开的视频标题、UP主名、封面地址、观看时长，发到你自己电脑上的 127.0.0.1:21456，\n" +
+        "用来整理你自己的兴趣。这些内容不出这台电脑，也不会发给任何网站。\n\n" +
+        "留空并确定 = 关闭这个功能。"
+      : "Paste the connection code of the interest service running on this computer (it prints one on startup).\n\n" +
+        "Once set, this script sends titles, uploader names, cover urls and watch time of videos you see and open to 127.0.0.1:21456 on your own machine,\n" +
+        "so it can build your own interest profile. Nothing leaves this computer and nothing is sent to any website.\n\n" +
+        "Leave empty to turn this off.",
+      cur);
+    if (inp === null) return;
+    localStorage.setItem("bfm_im_token", inp.trim());
+    alert(inp.trim()
+      ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.")
+      : (ZH ? "已关闭，脚本不再把任何浏览记录发出去。刷新页面生效。"
+            : "Turned off. The script no longer reports anything. Reload to apply."));
+  };
+  sw.appendChild(imBtn);
   document.body.appendChild(sw);
 
   // ---------- token 计量（纯观测，不干预请求）：逐请求累计 API 返回的 usage，精确值非估算 ----------
@@ -491,6 +601,7 @@
     const title = (t && (t.getAttribute("title") || t.textContent) || "").trim();
     const o = card.querySelector(".bili-video-card__info--author, .bili-video-card__info--owner");
     const owner = (o && o.textContent.trim().split("\n")[0].replace(/\s*·.*$/, "")) || "";
+    imReport({ type: "expose", id: bvid, t: title, u: owner, pic: imCover(card), dwell: 0, dur: 0 });
     if (!wrapOf(card).dataset.bfm) wrapOf(card).dataset.bfm = "pending"; // 分类完成前先藏起来
     queue.push(async () => {
       try { setCls(card, await classify(bvid, title, owner), bvid, owner); }

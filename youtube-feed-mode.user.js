@@ -19,6 +19,99 @@
   "use strict";
   if (window.__yfm) return; // 防止重复注入
 
+  // ================= 个人兴趣模型回传（默认关闭） =================
+  // 只有在开关条的 🔗 里填了连接码，下面这些才会做事；没填时全部空转，脚本行为与不带此功能时一致。
+  // 目标固定为本机 127.0.0.1 的兴趣服务（interest-model/daemon），发的是标题、频道名、视频 id、
+  // 封面地址、观看时长；不发 Cookie、不发账号、不发任何身份信息，也不发往本机以外的任何地方。
+  const IM_URL = "http://127.0.0.1:21456/events";
+  const IM_TOKEN = (localStorage.getItem("yfm_im_token") || "").trim();
+  const imQueue = [];
+  let imTimer = null;
+  function imFlush() {
+    imTimer = null;
+    if (!IM_TOKEN || !imQueue.length) return;
+    const batch = imQueue.splice(0, 200);
+    fetch(IM_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-IM-Token": IM_TOKEN },
+      body: JSON.stringify(batch),
+      keepalive: true,
+    }).catch(() => {}); // 本机服务没开就静默丢弃，不打扰用户
+  }
+  function imReport(ev) {
+    if (!IM_TOKEN) return;
+    ev.site = "youtube";
+    ev.ts = Date.now() / 1000;
+    imQueue.push(ev);
+    if (!imTimer) imTimer = setTimeout(imFlush, 5000);
+  }
+  const imCover = (id) => "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
+
+  // 观看时长：YouTube 是单页应用，切走一个视频就结算一次
+  if (IM_TOKEN) {
+    let watching = null;
+    const watchedId = () =>
+      location.pathname === "/watch" ? new URLSearchParams(location.search).get("v") : null;
+    const tick = () => {
+      if (!watching) return;
+      const now = Date.now();
+      if (watching.counting) watching.watched += (now - watching.lastTick) / 1000;
+      watching.lastTick = now;
+    };
+    const settle = () => {
+      tick();
+      if (watching && watching.watched >= 5) {
+        const v = document.querySelector("video");
+        imReport({
+          type: "watch", id: watching.id, t: watching.title, u: watching.up,
+          pic: imCover(watching.id), dwell: Math.round(watching.watched),
+          dur: v && v.duration ? Math.round(v.duration) : 0,
+        });
+        imFlush();
+      }
+      watching = null;
+    };
+    const sync = () => {
+      const id = watchedId();
+      if (watching && watching.id !== id) settle();
+      if (id && !watching) {
+        watching = { id, watched: 0, lastTick: Date.now(), counting: !document.hidden, title: "", up: "" };
+      }
+      if (!watching) return;
+      tick();
+      const h1 = document.querySelector("h1.ytd-watch-metadata, h1.title");
+      const ch = document.querySelector("#owner #channel-name a, ytd-channel-name a");
+      if (h1 && h1.textContent.trim()) watching.title = h1.textContent.trim();
+      if (ch && ch.textContent.trim()) watching.up = ch.textContent.trim();
+    };
+    setInterval(sync, 5000);
+    document.addEventListener("yt-navigate-finish", () => setTimeout(sync, 800));
+    document.addEventListener("visibilitychange", () => {
+      tick();
+      if (watching) watching.counting = !document.hidden;
+    });
+    window.addEventListener("pagehide", settle);
+    sync();
+  }
+
+  // 首页上点开一个视频，记一次「选择」（曝光在卡片处理里记）
+  document.addEventListener("click", (e) => {
+    if (!IM_TOKEN || !e.target.closest) return;
+    const a = e.target.closest('a[href*="watch?v="]');
+    if (!a) return;
+    const id = ((a.getAttribute("href") || "").match(/watch\?v=([\w-]{6,})/) || [])[1];
+    if (!id) return;
+    const card = a.closest("ytd-rich-item-renderer") || a;
+    const h3 = card.querySelector("h3");
+    const ch = card.querySelector('a[href^="/@"], ytd-channel-name a');
+    imReport({
+      type: "click", id,
+      t: ((h3 && h3.textContent) || a.getAttribute("title") || "").trim(),
+      u: ((ch && ch.textContent) || "").trim(),
+      pic: imCover(id), dwell: 0, dur: 0,
+    });
+  }, true);
+
   // ================= 配置 =================
   // API Key 通过左下角开关条上的 ⚙ 设置，仅存于你浏览器的 localStorage（youtube.com 域下）
   const API_KEY = (localStorage.getItem("yfm_api_key") || "").trim();
@@ -211,6 +304,30 @@
     alert(inp.trim() ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.") : (ZH ? "已清除 Key，将仅使用本地模型分类。刷新页面生效。" : "Key removed. The built-in local model will be used. Reload to apply."));
   };
   sw.appendChild(cfgBtn);
+  // 连接码：填了才把浏览记录交给本机的兴趣程序，留空 = 这个功能完全不存在
+  const imBtn = document.createElement("button");
+  imBtn.textContent = "🔗";
+  imBtn.title = ZH ? "连接码（本机兴趣程序）" : "Connection code (local interest service)";
+  imBtn.onclick = () => {
+    const cur = localStorage.getItem("yfm_im_token") || "";
+    const inp = prompt(ZH
+      ? "粘贴本机兴趣程序的连接码（程序启动时会打印，也可以在 Breadcrumb 的发现页上复制）。\n\n" +
+        "填好之后，脚本会把你在 YouTube 看到和点开的视频标题、频道名、封面地址、观看时长，发到你自己电脑上的 127.0.0.1:21456，\n" +
+        "用来整理你自己的兴趣。这些内容不出这台电脑，也不会发给任何网站。\n\n" +
+        "留空并确定 = 关闭这个功能。"
+      : "Paste the connection code of the interest service running on this computer (it prints one on startup).\n\n" +
+        "Once set, this script sends titles, channel names, cover urls and watch time of videos you see and open to 127.0.0.1:21456 on your own machine,\n" +
+        "so it can build your own interest profile. Nothing leaves this computer and nothing is sent to any website.\n\n" +
+        "Leave empty to turn this off.",
+      cur);
+    if (inp === null) return;
+    localStorage.setItem("yfm_im_token", inp.trim());
+    alert(inp.trim()
+      ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.")
+      : (ZH ? "已关闭，脚本不再把任何浏览记录发出去。刷新页面生效。"
+            : "Turned off. The script no longer reports anything. Reload to apply."));
+  };
+  sw.appendChild(imBtn);
   document.body.appendChild(sw);
 
   // ---------- token 计量（纯观测，不干预请求）：逐请求累计 API 返回的 usage，精确值非估算 ----------
@@ -410,6 +527,7 @@
     const chA = card.querySelector('a[href^="/@"], ytd-channel-name a');
     const owner = (chA && chA.textContent.trim()) || "";
     if (!title) { delete card.dataset.yfmSeen; return; } // 标题未渲染，下一轮再试
+    imReport({ type: "expose", id: vid, t: title, u: owner, pic: imCover(vid), dwell: 0, dur: 0 });
     if (!card.dataset.yfm) card.dataset.yfm = "pending"; // 分类完成前先藏起来（过滤模式下）
     queue.push(async () => {
       try { card.dataset.yfm = await classify(vid, title, owner); }
