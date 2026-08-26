@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      1.2.0
+// @version      1.2.1
 // @description  用 LLM 把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。需自备 DeepSeek API Key（⚙ 设置，启用后视频标题/频道名会发送给 DeepSeek 用于分类）。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -108,7 +108,7 @@
   cfgBtn.onclick = () => {
     const cur = localStorage.getItem("yfm_api_key") || "";
     const inp = prompt(
-      "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，费用自理）。\n" +
+      "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，用量与费用由你在 DeepSeek 后台自理，本脚本免费且不经手任何费用）。\n" +
       "留空并确定 = 关闭 LLM 分类，使用本地关键词规则（免费但较不准确）。\n\n" +
       "隐私说明：启用后，仅视频的「标题、频道名」会发送给 DeepSeek 用于分类；\n" +
       "不会发送你的账号信息、Cookie 或观看历史。Key 仅保存在你自己的浏览器中。",
