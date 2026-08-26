@@ -1,0 +1,78 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>我的兴趣画像</title>
+<style>
+  body { font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 880px; margin: 24px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 20px; } h2 { font-size: 15px; margin: 22px 0 8px; color: #444; }
+  .muted { color: #888; font-size: 12px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 13px; }
+  .bar-row .name { width: 130px; text-align: right; flex-shrink: 0; }
+  .bar-wrap { flex: 1; background: #f0f1f3; border-radius: 4px; height: 16px; position: relative; }
+  .bar { height: 100%; border-radius: 4px; background: #4c86d8; }
+  .bar.short { background: #45b880; }
+  .bar.gap { background: #d8874c; }
+  .pct { width: 48px; font-size: 12px; color: #666; }
+  .drivers { font-size: 12px; color: #666; margin: 2px 0 8px 138px; }
+  .pref { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 3px 0; }
+  .pref .name { width: 130px; text-align: right; }
+  .pref input { width: 160px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 700px) { .cols { grid-template-columns: 1fr; } }
+</style>
+<h1>我的兴趣画像 <span class="muted" id="meta"></span></h1>
+<p class="muted">全部数据只在这台机器上。左：长期兴趣（约 90 天记忆）；右：最近兴趣（约 7 天记忆）。</p>
+<div class="cols">
+  <div><h2>长期兴趣</h2><div id="long"></div></div>
+  <div><h2>最近兴趣</h2><div id="short"></div></div>
+</div>
+<h2>投喂 vs 选择 <span class="muted">——平台给你看了什么（曝光） vs 你实际看了什么（互动）差得最远的主题</span></h2>
+<div id="gap"></div>
+<h2>兴趣的来源 <span class="muted">——每个主要兴趣背后最近看过的内容</span></h2>
+<div id="drivers"></div>
+<h2>我的申明 <span class="muted">——拖动声明"想多看/想少看"，这会覆盖行为记录的倾向（需在插件侧生效）</span></h2>
+<div id="prefs"></div>
+<script>
+async function main() {
+  const d = await (await fetch("/profile")).json();
+  document.getElementById("meta").textContent = `（${d.n_events} 个事件 · 分类引擎: ${d.classifier}）`;
+  const topN = (dist, n) => dist.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, n).filter(x => x[0] > 0.005);
+  const render = (elId, dist, cls) => {
+    const el = document.getElementById(elId);
+    el.innerHTML = "";
+    for (const [v, i] of topN(dist, 12)) {
+      el.insertAdjacentHTML("beforeend",
+        `<div class="bar-row"><span class="name">${d.topics[i]}</span>
+         <div class="bar-wrap"><div class="bar ${cls}" style="width:${Math.min(100, v * 250)}%"></div></div>
+         <span class="pct">${(v * 100).toFixed(1)}%</span></div>`);
+    }
+    if (!el.innerHTML) el.innerHTML = '<p class="muted">还没有足够数据，去刷一会儿吧。</p>';
+  };
+  render("long", d.long, "");
+  render("short", d.short, "short");
+  // 投喂 vs 选择：曝光占比高于互动占比最多的主题（平台想喂但你不吃 → 正差），反之你主动找的
+  const gaps = d.topics.map((t, i) => [d.expose[i] - d.long[i], i]).sort((a, b) => b[0] - a[0]);
+  const gapEl = document.getElementById("gap");
+  const fmt = ([g, i], label) => `<div class="bar-row"><span class="name">${d.topics[i]}</span>
+      <div class="bar-wrap"><div class="bar gap" style="width:${Math.min(100, Math.abs(g) * 400)}%"></div></div>
+      <span class="pct">${label}</span></div>`;
+  for (const x of gaps.slice(0, 4)) if (x[0] > 0.01) gapEl.insertAdjacentHTML("beforeend", fmt(x, "被投喂↑"));
+  for (const x of gaps.slice(-4).reverse()) if (x[0] < -0.01) gapEl.insertAdjacentHTML("beforeend", fmt(x, "你主动↑"));
+  const dr = document.getElementById("drivers");
+  for (const [topic, items] of Object.entries(d.drivers)) {
+    dr.insertAdjacentHTML("beforeend", `<div class="bar-row"><span class="name">${topic}</span></div>
+      <div class="drivers">${items.map(x => `${x.title}（${x.up}）`).join("<br>")}</div>`);
+  }
+  const pr = document.getElementById("prefs");
+  for (const [v, i] of topN(d.long, 8)) {
+    const t = d.topics[i], cur = d.prefs[t] || 0;
+    pr.insertAdjacentHTML("beforeend", `<div class="pref"><span class="name">${t}</span>
+      <input type="range" min="-2" max="2" step="1" value="${cur}" data-t="${t}">
+      <span class="muted">${cur > 0 ? "多看" : cur < 0 ? "少看" : "中性"}</span></div>`);
+  }
+  pr.addEventListener("change", async (e) => {
+    if (e.target.tagName !== "INPUT") return;
+    alert("申明偏好的写入需要令牌，请在插件里操作（仪表盘为只读展示）。");
+  });
+}
+main();
+</script>
