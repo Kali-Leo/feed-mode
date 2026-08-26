@@ -4,6 +4,8 @@
 
 **为 B站 / YouTube 首页推荐流提供「专业 · 精选娱乐 · 娱乐」一键切换**
 
+中文 | [English](README.en.md)
+
 [![B站版](https://img.shields.io/greasyfork/v/592929?label=B%E7%AB%99%E7%89%88&color=00aeec)](https://greasyfork.org/zh-CN/scripts/592929)
 [![YouTube版](https://img.shields.io/greasyfork/v/592932?label=YouTube%E7%89%88&color=ff0000)](https://greasyfork.org/zh-CN/scripts/592932)
 [![安装量](https://img.shields.io/greasyfork/dt/592929?label=%E5%AE%89%E8%A3%85%E9%87%8F)](https://greasyfork.org/zh-CN/scripts/592929)

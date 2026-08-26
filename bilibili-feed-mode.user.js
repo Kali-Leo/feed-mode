@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         B站首页 娱乐/专业 模式切换
+// @name:en      Bilibili Feed Mode: Learn / Feel-good / Fun
 // @namespace    leo.bilibili.feedmode
-// @version      2.0.2
+// @version      2.0.3
 // @description  内置本地 AI 小模型 + 大模型复核，把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与哔哩哔哩无关联。
+// @description:en  Filter your Bilibili home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box - no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with Bilibili.
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
 // @grant        none
@@ -25,6 +27,7 @@
   const API_URL = localStorage.getItem("bfm_api_url") || "https://api.deepseek.com/chat/completions";
   const MODEL = localStorage.getItem("bfm_model") || "deepseek-v4-flash"; // 旧名 deepseek-chat 已于 2026-07 退役
   const BATCH_SIZE = 40;     // 攒够多少条发一次请求（批量越大，system prompt 摊得越薄）
+  const ZH = (navigator.language || "").toLowerCase().startsWith("zh"); // 界面语言跟随浏览器
   const BATCH_WAIT_MS = 400; // 或最多等待多久
   // ========================================
 
@@ -205,7 +208,7 @@
   let mode = localStorage.getItem(LS.mode) || "all";
   const sw = document.createElement("div");
   sw.id = "bfm-switch";
-  for (const [m, label] of [["all", "全部"], ["ent", "娱乐"], ["gent", "精选娱乐"], ["pro", "专业"]]) {
+  for (const [m, label] of (ZH ? [["all", "全部"], ["ent", "娱乐"], ["gent", "精选娱乐"], ["pro", "专业"]] : [["all", "All"], ["ent", "Fun"], ["gent", "Feel-good"], ["pro", "Learn"]])) {
     const b = document.createElement("button");
     b.textContent = label;
     b.dataset.m = m;
@@ -214,20 +217,26 @@
   }
   const cfgBtn = document.createElement("button");
   cfgBtn.textContent = "⚙";
-  cfgBtn.title = "设置 API Key（用于 LLM 智能分类）";
+  cfgBtn.title = ZH ? "设置 API Key（用于 LLM 智能分类）" : "Set API key for AI classification";
   cfgBtn.onclick = () => {
     const cur = localStorage.getItem("bfm_api_key") || "";
-    const inp = prompt(
-      "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，用量与费用由你在 DeepSeek 后台自理，本脚本免费且不经手任何费用）。\n" +
-      "不填也能用：内置本地小模型（免费离线）支撑「专业」模式主要功能，填 Key 后由大模型复核、精度更高。\n\n" +
-      "隐私说明：启用后，仅视频的「标题、UP主名、标签」会发送给 DeepSeek 用于分类；\n" +
-      "不会发送你的账号信息、Cookie 或观看历史。Key 仅保存在你自己的浏览器中。",
+    const inp = prompt(ZH
+      ? "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，用量与费用由你在 DeepSeek 后台自理，本脚本免费且不经手任何费用）。\n" +
+        "不填也能用：内置本地小模型（免费离线）支撑「专业」模式主要功能，填 Key 后由大模型复核、精度更高。\n\n" +
+        "隐私说明：启用后，仅视频的「标题、UP主名、标签」会发送给 DeepSeek 用于分类；\n" +
+        "不会发送你的账号信息、Cookie 或观看历史。Key 仅保存在你自己的浏览器中。"
+      : "Enter your DeepSeek API key (get one at platform.deepseek.com; usage is billed by DeepSeek to you — this script is free and never handles money).\n" +
+        "Optional: the built-in local model already powers Learn mode offline for free; a key adds cloud review for higher accuracy.\n\n" +
+        "Privacy: only video titles, uploader names and tags are sent to DeepSeek for classification;\n" +
+        "never your account, cookies or watch history. The key stays in your browser.",
       cur);
     if (inp === null) return;
     localStorage.setItem("bfm_api_key", inp.trim());
     alert(inp.trim()
-      ? "已保存，刷新页面生效。\n\n本地模型会先过滤大部分内容、只把少数送云端，已分类内容还有本地缓存不再重复调用，因此用量通常很省。\n开关条上实时显示你的用量，「容忍」滑条可进一步降低（越高越省）。\n具体费用请以 DeepSeek 后台的实际用量与账单为准。"
-      : "已清除 Key。本地小模型仍支撑「专业」模式主要功能，精选娱乐改用关键词规则。刷新页面生效。");
+      ? (ZH ? "已保存，刷新页面生效。\n\n本地模型会先过滤大部分内容、只把少数送云端，已分类内容还有本地缓存不再重复调用，因此用量通常很省。\n开关条上实时显示你的用量，「容忍」滑条可进一步降低（越高越省）。\n具体费用请以 DeepSeek 后台的实际用量与账单为准。"
+            : "Saved. Reload the page to apply.\n\nThe local model filters most items first and only sends a few to the cloud; already-classified videos are cached and never re-sent, so usage stays low.\nLive usage is shown on the switch bar, and the tolerance slider can lower it further.\nActual charges follow your DeepSeek dashboard.")
+      : (ZH ? "已清除 Key。本地小模型仍支撑「专业」模式主要功能，精选娱乐改用关键词规则。刷新页面生效。"
+            : "Key removed. The built-in local model still powers Learn mode; finer modes fall back to keyword rules. Reload to apply."));
   };
   sw.appendChild(cfgBtn);
   document.body.appendChild(sw);
@@ -240,7 +249,7 @@
   const tokDayStr = () => { const t = new Date(); return t.getFullYear() + "-" + (t.getMonth() + 1) + "-" + t.getDate(); };
   const tokRoll = () => { const d = tokDayStr(); if (tok.day !== d) { tok.day = d; tok.dIn = tok.dHit = tok.dOut = 0; tok.dC = 0; } };
   const tokDayUsed = () => { tokRoll(); return tok.dIn + tok.dOut; };
-  const fmtTok = (n) => n >= 1e8 ? (n / 1e8).toFixed(2) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n);
+  const fmtTok = (n) => ZH ? (n >= 1e8 ? (n / 1e8).toFixed(2) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n)) : (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n));
   function addUsage(u) {
     if (!u) return;
     tokRoll();
@@ -258,12 +267,18 @@
   tokChip.id = "bfm-tok";
   function tokRender() {
     tokRoll();
-    tokChip.textContent = "今日" + fmtTok(tokDayUsed()) + "tok";
-    tokChip.title = "本站 LLM 用量（逐请求累计 API 返回的 usage）\n" +
-      "今日：输入 " + fmtTok(tok.dIn) + "（缓存命中 " + fmtTok(tok.dHit) + "）+ 输出 " + fmtTok(tok.dOut) +
-      " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
-      "累计：" + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " 次请求 ≈ ¥" + (tok.c || 0).toFixed(2) + "\n" +
-      "本地模型先过滤、缓存不重复调用，用量通常很省；具体费用以 DeepSeek 后台账单为准";
+    tokChip.textContent = (ZH ? "今日" : "Today ") + fmtTok(tokDayUsed()) + "tok";
+    tokChip.title = ZH
+      ? "本站 LLM 用量（逐请求累计 API 返回的 usage）\n" +
+        "今日：输入 " + fmtTok(tok.dIn) + "（缓存命中 " + fmtTok(tok.dHit) + "）+ 输出 " + fmtTok(tok.dOut) +
+        " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
+        "累计：" + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " 次请求 ≈ ¥" + (tok.c || 0).toFixed(2) + "\n" +
+        "本地模型先过滤、缓存不重复调用，用量通常很省；具体费用以 DeepSeek 后台账单为准"
+      : "LLM usage on this site (exact, from API-reported usage)\n" +
+        "Today: in " + fmtTok(tok.dIn) + " (cache hit " + fmtTok(tok.dHit) + ") + out " + fmtTok(tok.dOut) +
+        " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
+        "Total: " + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " requests ≈ ¥" + (tok.c || 0).toFixed(2) + "\n" +
+        "The local model filters first and cached items are never re-sent; actual charges follow your DeepSeek dashboard";
   }
   if (API_KEY) { sw.appendChild(tokChip); tokRender(); }
 
@@ -595,8 +610,8 @@
   // 容忍度滑条：控制「多花 token 换更准」还是「更依赖本地模型更省」（设置 Key 后显示）
   const tolUI = document.createElement("div");
   tolUI.id = "bfm-tol";
-  tolUI.title = "分类容忍度：越低 → 越多内容送大模型复核，更准但更费；越高 → 越依赖本地小模型，几乎免费但可能出现少量错分或漏内容。右侧数字为预计送大模型的比例。";
-  tolUI.innerHTML = '<span>容忍</span><input type="range" min="0" max="100" step="10"><b></b>';
+  tolUI.title = ZH ? "分类容忍度：越低 → 越多内容送大模型复核，更准但更费；越高 → 越依赖本地小模型，几乎免费但可能出现少量错分或漏内容。右侧数字为预计送大模型的比例。" : "Tolerance: lower sends more items to the cloud model (more accurate, costs more); higher relies on the free local model (a few misclassifications possible). The number shows the estimated share sent to the cloud.";
+  tolUI.innerHTML = '<span>' + (ZH ? "容忍" : "Tol") + '</span><input type="range" min="0" max="100" step="10"><b></b>';
   if (API_KEY) sw.appendChild(tolUI);
   const tolInput = tolUI.querySelector("input"), tolLabel = tolUI.querySelector("b");
   const tolRender = () => { tolLabel.textContent = "AI" + Math.round(fmShareEst() * 100) + "%"; };

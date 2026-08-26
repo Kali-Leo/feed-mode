@@ -1,8 +1,10 @@
 // ==UserScript==
-// @name         YouTube 首页 娱乐/专业 模式切换
+// @name         YouTube Feed Mode: Learn / Feel-good / Fun
+// @name:zh-CN   YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      2.0.0
-// @description  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
+// @version      2.0.1
+// @description  Filter your YouTube home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box — no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with YouTube/Google.
+// @description:zh-CN  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        none
 // @run-at       document-idle
@@ -23,6 +25,7 @@
   const API_URL = localStorage.getItem("yfm_api_url") || "https://api.deepseek.com/chat/completions";
   const MODEL = localStorage.getItem("yfm_model") || "deepseek-v4-flash"; // 旧名 deepseek-chat 已于 2026-07 退役
   const BATCH_SIZE = 40; // 批量越大，system prompt 摊得越薄
+  const ZH = (navigator.language || "").toLowerCase().startsWith("zh"); // 界面语言跟随浏览器
   const BATCH_WAIT_MS = 300;
   // ========================================
 
@@ -181,7 +184,7 @@
   let mode = localStorage.getItem("yfm_mode") || "all";
   const sw = document.createElement("div");
   sw.id = "yfm-switch";
-  for (const [m, label] of [["all", "全部"], ["ent", "娱乐"], ["gent", "精选娱乐"], ["pro", "专业"]]) {
+  for (const [m, label] of (ZH ? [["all", "全部"], ["ent", "娱乐"], ["gent", "精选娱乐"], ["pro", "专业"]] : [["all", "All"], ["ent", "Fun"], ["gent", "Feel-good"], ["pro", "Learn"]])) {
     const b = document.createElement("button");
     b.textContent = label;
     b.dataset.m = m;
@@ -190,18 +193,22 @@
   }
   const cfgBtn = document.createElement("button");
   cfgBtn.textContent = "⚙";
-  cfgBtn.title = "设置 API Key（用于 LLM 智能分类）";
+  cfgBtn.title = ZH ? "设置 API Key（用于 LLM 智能分类）" : "Set API key for AI classification";
   cfgBtn.onclick = () => {
     const cur = localStorage.getItem("yfm_api_key") || "";
-    const inp = prompt(
-      "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，用量与费用由你在 DeepSeek 后台自理，本脚本免费且不经手任何费用）。\n" +
-      "留空并确定 = 关闭 LLM 分类，使用本地关键词规则（免费但较不准确）。\n\n" +
-      "隐私说明：启用后，仅视频的「标题、频道名」会发送给 DeepSeek 用于分类；\n" +
-      "不会发送你的账号信息、Cookie 或观看历史。Key 仅保存在你自己的浏览器中。",
+    const inp = prompt(ZH
+      ? "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，用量与费用由你在 DeepSeek 后台自理，本脚本免费且不经手任何费用）。\n" +
+        "留空并确定 = 不用云端，仅由内置本地模型分类。\n\n" +
+        "隐私说明：启用后，仅视频的「标题、频道名」会发送给 DeepSeek 用于分类；\n" +
+        "不会发送你的账号信息、Cookie 或观看历史。Key 仅保存在你自己的浏览器中。"
+      : "Enter your DeepSeek API key (get one at platform.deepseek.com; usage is billed by DeepSeek to you — this script is free and never handles money).\n" +
+        "Leave empty to skip the cloud and classify with the built-in local model only.\n\n" +
+        "Privacy: only video titles and channel names are sent to DeepSeek for classification;\n" +
+        "never your account, cookies or watch history. The key stays in your browser.",
       cur);
     if (inp === null) return;
     localStorage.setItem("yfm_api_key", inp.trim());
-    alert(inp.trim() ? "已保存，刷新页面生效。" : "已清除 Key，将使用本地关键词分类。刷新页面生效。");
+    alert(inp.trim() ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.") : (ZH ? "已清除 Key，将仅使用本地模型分类。刷新页面生效。" : "Key removed. The built-in local model will be used. Reload to apply."));
   };
   sw.appendChild(cfgBtn);
   document.body.appendChild(sw);
@@ -214,7 +221,7 @@
   const tokDayStr = () => { const t = new Date(); return t.getFullYear() + "-" + (t.getMonth() + 1) + "-" + t.getDate(); };
   const tokRoll = () => { const d = tokDayStr(); if (tok.day !== d) { tok.day = d; tok.dIn = tok.dHit = tok.dOut = 0; tok.dC = 0; } };
   const tokDayUsed = () => { tokRoll(); return tok.dIn + tok.dOut; };
-  const fmtTok = (n) => n >= 1e8 ? (n / 1e8).toFixed(2) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n);
+  const fmtTok = (n) => ZH ? (n >= 1e8 ? (n / 1e8).toFixed(2) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n)) : (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n));
   function addUsage(u) {
     if (!u) return;
     tokRoll();
@@ -232,19 +239,24 @@
   tokChip.id = "yfm-tok";
   function tokRender() {
     tokRoll();
-    tokChip.textContent = "今日" + fmtTok(tokDayUsed()) + "tok";
-    tokChip.title = "本站 LLM 用量（逐请求累计 API 返回的 usage）\n" +
-      "今日：输入 " + fmtTok(tok.dIn) + "（缓存命中 " + fmtTok(tok.dHit) + "）+ 输出 " + fmtTok(tok.dOut) +
-      " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
-      "累计：" + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " 次请求 ≈ ¥" + (tok.c || 0).toFixed(2);
+    tokChip.textContent = (ZH ? "今日" : "Today ") + fmtTok(tokDayUsed()) + "tok";
+    tokChip.title = ZH
+      ? "本站 LLM 用量（逐请求累计 API 返回的 usage）\n" +
+        "今日：输入 " + fmtTok(tok.dIn) + "（缓存命中 " + fmtTok(tok.dHit) + "）+ 输出 " + fmtTok(tok.dOut) +
+        " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
+        "累计：" + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " 次请求 ≈ ¥" + (tok.c || 0).toFixed(2)
+      : "LLM usage on this site (exact, from API-reported usage)\n" +
+        "Today: in " + fmtTok(tok.dIn) + " (cache hit " + fmtTok(tok.dHit) + ") + out " + fmtTok(tok.dOut) +
+        " ≈ ¥" + (tok.dC || 0).toFixed(3) + "\n" +
+        "Total: " + fmtTok(tok.in + tok.out) + " tok / " + tok.req + " requests ≈ ¥" + (tok.c || 0).toFixed(2);
   }
   if (API_KEY) { sw.appendChild(tokChip); tokRender(); }
   // 容忍度滑条：更准更费 ←→ 更省更依赖本地模型
   const tolUI = document.createElement("div");
   tolUI.id = "yfm-tol";
-  tolUI.title = "分类容忍度：越低越多内容送大模型复核，更准但更费；越高越依赖本地小模型，几乎免费但可能有少量错分或漏内容。右侧数字为预计送大模型的比例。";
+  tolUI.title = ZH ? "分类容忍度：越低越多内容送大模型复核，更准但更费；越高越依赖本地小模型，几乎免费但可能有少量错分或漏内容。右侧数字为预计送大模型的比例。" : "Tolerance: lower sends more items to the cloud model (more accurate, costs more); higher relies on the free local model (a few misclassifications possible). The number shows the estimated share sent to the cloud.";
   const tolSpan = document.createElement("span");
-  tolSpan.textContent = "容忍";
+  tolSpan.textContent = ZH ? "容忍" : "Tol";
   const tolInput = document.createElement("input");
   tolInput.type = "range"; tolInput.min = "0"; tolInput.max = "100"; tolInput.step = "10";
   const tolLabel = document.createElement("b");
