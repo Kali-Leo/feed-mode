@@ -163,14 +163,24 @@ def q_days(query, default=30):
         return default
 
 
-def emotion_series(days):
-    """按天聚合：投喂(曝光) vs 选择(点击/观看) 的平均效价与情绪构成。"""
+PRO_SQL = "(" + ",".join(str(t) for t in sorted(PRO_TOPICS)) + ")"
+CAT_SQL = {
+    "all": "1=1",
+    "pro": f"topic IN {PRO_SQL}",
+    "ent": f"topic NOT IN {PRO_SQL}",
+    "gent": f"topic NOT IN {PRO_SQL} AND valence >= 0.5",
+}
+
+
+def emotion_series(days, cat="all"):
+    """按天聚合：投喂(曝光) vs 选择(点击/观看) 的平均效价与情绪构成，可按内容类别过滤。"""
     since = time.time() - days * 86400
+    cat_cond = CAT_SQL.get(cat, "1=1")
     out = {}
     for label, cond in [("expose", "etype='expose'"), ("engage", "etype!='expose'")]:
         rows = ST.db.execute(
             f"SELECT CAST(ts/86400 AS INT)*86400 AS day, AVG(valence), COUNT(*), emo "
-            f"FROM events WHERE ts>=? AND valence IS NOT NULL AND {cond} GROUP BY day, emo",
+            f"FROM events WHERE ts>=? AND valence IS NOT NULL AND {cond} AND {cat_cond} GROUP BY day, emo",
             (since,)).fetchall()
         days_map = {}
         for day, avgv, n, emo in rows:
@@ -236,6 +246,23 @@ def pro_content(days):
     return {"days": days, "finished": fin[:100], "unfinished": unfin[:100]}
 
 
+def new_interests():
+    """新的兴趣：近期占比显著且相对长期明显上升的主题，附最近点开的内容。"""
+    d = ST.dists()
+    out = []
+    for i in range(N):
+        s, l = d["short"][i], d["long"][i]
+        if s >= 0.03 and s >= 2.0 * max(l, 0.005):
+            rows = ST.db.execute(
+                "SELECT title, up, vid, site FROM events WHERE topic=? AND etype!='expose' "
+                "AND ts>=? ORDER BY ts DESC LIMIT 3",
+                (i, time.time() - 14 * 86400)).fetchall()
+            out.append({"topic": LEAVES[i], "share": round(s, 3), "before": round(l, 3),
+                        "items": [{"title": r[0], "up": r[1], "id": r[2], "site": r[3]} for r in rows]})
+    out.sort(key=lambda x: -x["share"])
+    return {"interests": out[:6]}
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -286,7 +313,9 @@ class H(BaseHTTPRequestHandler):
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
                         "classifier": CLF.mode, "emotion_on": CLF.emo_clf is not None})
         elif u.path == "/emotion_series":
-            self._json(emotion_series(q_days(query, 60)))
+            self._json(emotion_series(q_days(query, 60), query.get("cat", ["all"])[0]))
+        elif u.path == "/new_interests":
+            self._json(new_interests())
         elif u.path == "/wordcloud":
             self._json(wordcloud(q_days(query, 30), query.get("source", ["engage"])[0]))
         elif u.path == "/pro_content":

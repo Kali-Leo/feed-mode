@@ -1,143 +1,214 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>我的兴趣画像</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>兴趣</title>
 <style>
-  body { font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 920px; margin: 24px auto; padding: 0 16px; color: #222; }
-  h1 { font-size: 20px; } h2 { font-size: 15px; margin: 26px 0 8px; color: #444; }
-  .muted { color: #888; font-size: 12px; }
-  .bar-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 13px; }
-  .bar-row .name { width: 130px; text-align: right; flex-shrink: 0; }
-  .bar-wrap { flex: 1; background: #f0f1f3; border-radius: 4px; height: 16px; }
-  .bar { height: 100%; border-radius: 4px; background: #4c86d8; }
-  .bar.short { background: #45b880; }
-  .bar.gap { background: #d8874c; }
-  .pct { width: 48px; font-size: 12px; color: #666; }
-  .drivers { font-size: 12px; color: #666; margin: 2px 0 8px 138px; }
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  @media (max-width: 700px) { .cols { grid-template-columns: 1fr; } }
-  .win { font-size: 12px; margin-left: 8px; }
-  .win button { border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 1px 8px; cursor: pointer; margin-right: 4px; font-size: 12px; }
-  .win button.on { background: #4c86d8; color: #fff; border-color: #4c86d8; }
-  #cloud { line-height: 2.1; }
-  #cloud span { margin: 0 7px; display: inline-block; }
-  .list { font-size: 13px; }
-  .list li { margin: 4px 0; }
-  .list .meta { color: #999; font-size: 11px; margin-left: 6px; }
-  svg text { font-size: 10px; fill: #888; }
-  .legend { font-size: 12px; color: #555; margin: 4px 0; }
-  .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; background: #fcfcfb;
+         color: #0b0b0b; max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; font-size: 13px; }
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: .5px; color: #0b0b0b;
+       margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e8e7e3;
+       display: flex; align-items: baseline; gap: 14px; }
+  h2:first-of-type { margin-top: 8px; }
+  .seg { display: inline-flex; gap: 0; font-weight: 400; }
+  .seg button { border: 1px solid #dcdbd6; border-right: 0; background: #fff; color: #52514e;
+                padding: 2px 10px; cursor: pointer; font-size: 12px; }
+  .seg button:first-child { border-radius: 4px 0 0 4px; }
+  .seg button:last-child { border-right: 1px solid #dcdbd6; border-radius: 0 4px 4px 0; }
+  .seg button.on { background: #0b0b0b; color: #fff; border-color: #0b0b0b; }
+  .legend { margin-left: auto; font-weight: 400; font-size: 12px; color: #52514e; display: flex; gap: 12px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  #chartwrap { position: relative; }
+  #tip { position: absolute; pointer-events: none; background: #0b0b0b; color: #fff; font-size: 11px;
+         padding: 4px 8px; border-radius: 4px; white-space: nowrap; display: none; z-index: 2; }
+  #cloudc { display: block; width: 100%; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  @media (max-width: 680px) { .cols { grid-template-columns: 1fr; } }
+  .sub { font-size: 12px; font-weight: 600; color: #52514e; margin: 2px 0 6px; }
+  ul.items { list-style: none; margin: 0; padding: 0; }
+  ul.items li { padding: 4px 0; border-bottom: 1px solid #f1f0ec; line-height: 1.45; }
+  ul.items a { color: #1a5fb4; text-decoration: none; }
+  ul.items a:hover { text-decoration: underline; }
+  .meta { color: #8a897f; font-size: 11px; }
+  .ni-topic { font-weight: 600; }
+  .ni-share { color: #2a78d6; font-size: 12px; margin-left: 6px; }
+  .empty { color: #8a897f; padding: 8px 0; }
+  svg text { font-size: 10px; fill: #8a897f; }
 </style>
-<h1>我的兴趣画像 <span class="muted" id="meta"></span></h1>
-<p class="muted">全部数据只在这台机器上。</p>
 
-<h2>内容情绪监测 <span class="muted">——平台投喂的情绪 vs 你点开的情绪（效价：+2 治愈 … −2 焦虑/愤怒）</span></h2>
-<div class="legend"><i style="background:#d85c5c"></i>平台投喂 <i style="background:#45b880;margin-left:10px"></i>我的选择</div>
-<svg id="emochart" width="100%" height="180" viewBox="0 0 880 180" preserveAspectRatio="none"></svg>
-<div id="emomix" class="muted"></div>
-
-<h2>词云 <span class="muted">——我点开的内容里的高频词，颜色=情绪倾向（绿正红负）</span>
-  <span class="win" id="cloudwin"><button data-d="7">7天</button><button data-d="30" class="on">30天</button><button data-d="90">90天</button><button data-d="365">一年</button></span>
+<h2>内容情绪
+  <span class="seg" id="ecat">
+    <button data-c="all" class="on">全部</button><button data-c="pro">专业</button><button data-c="ent">娱乐</button><button data-c="gent">精选娱乐</button>
+  </span>
+  <span class="legend"><span><i style="background:#eb6834"></i>投喂</span><span><i style="background:#2a78d6"></i>选择</span></span>
 </h2>
-<div id="cloud"></div>
-
-<h2>专业内容整理 <span class="muted">——你点开过的专业内容（科技/知识/财经/纪实）</span>
-  <span class="win" id="prowin"><button data-d="7">7天</button><button data-d="30" class="on">30天</button><button data-d="90">90天</button></span>
-</h2>
-<div class="cols">
-  <div><h2 style="margin-top:4px">没看完的 <span class="muted">（也许值得回去补完）</span></h2><ul class="list" id="pro-unfin"></ul></div>
-  <div><h2 style="margin-top:4px">看完的</h2><ul class="list" id="pro-fin"></ul></div>
+<div id="chartwrap">
+  <svg id="chart" width="100%" height="190" viewBox="0 0 860 190"></svg>
+  <div id="tip"></div>
 </div>
 
+<h2>词云
+  <span class="seg" id="cwin">
+    <button data-d="7">7天</button><button data-d="30" class="on">30天</button><button data-d="90">90天</button><button data-d="365">一年</button>
+  </span>
+</h2>
+<canvas id="cloudc" width="860" height="380"></canvas>
+
+<h2>新的兴趣</h2>
+<ul class="items" id="newint"></ul>
+
+<h2>专业内容</h2>
 <div class="cols">
-  <div><h2>长期兴趣</h2><div id="long"></div></div>
-  <div><h2>最近兴趣</h2><div id="short"></div></div>
+  <div><div class="sub">没看完</div><ul class="items" id="unfin"></ul></div>
+  <div><div class="sub">看完</div><ul class="items" id="fin"></ul></div>
 </div>
-<h2>投喂 vs 选择 <span class="muted">——平台给你看的（曝光）与你实际看的（互动）差距最大的主题</span></h2>
-<div id="gap"></div>
-<h2>兴趣的来源 <span class="muted">——每个主要兴趣背后最近看过的内容</span></h2>
-<div id="drivers"></div>
 
 <script>
-const valColor = v => {
-  const t = Math.max(-2, Math.min(2, v)) / 2;  // -1..1
-  return t >= 0 ? `rgb(${Math.round(69+(1-t)*120)},${Math.round(140+t*44)},${Math.round(96)})`
-                : `rgb(${Math.round(190+(-t)*40)},${Math.round(110+(1+t)*60)},${Math.round(90)})`;
+const C_FEED = "#eb6834", C_PICK = "#2a78d6";
+const linkOf = (site, id) => !id ? null :
+  id.startsWith("BV") ? `https://www.bilibili.com/video/${id}` :
+  site === "youtube" ? `https://www.youtube.com/watch?v=${id}` : null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const titleHtml = it => {
+  const url = linkOf(it.site, it.id);
+  const t = esc(it.title || it.t || "");
+  return url ? `<a href="${url}" target="_blank">${t}</a>` : t;
 };
-async function loadEmotion() {
-  const d = await (await fetch("/emotion_series?days=90")).json();
-  const svg = document.getElementById("emochart");
+
+// ---------- 情绪双曲线 ----------
+let curveData = null;
+async function loadEmotion(cat) {
+  const d = await (await fetch(`/emotion_series?days=90&cat=${cat}`)).json();
+  curveData = d;
+  const svg = document.getElementById("chart");
   const all = [...d.expose, ...d.engage];
-  if (!all.length) { svg.outerHTML = '<p class="muted">还没有情绪数据。</p>'; return; }
-  const days = [...new Set(all.map(x => x.day))].sort((a, b) => a - b);
-  const X = day => 30 + (days.indexOf(day) / Math.max(1, days.length - 1)) * 830;
-  const Y = v => 90 - v * 38; // valence -2..2 -> 166..14
+  if (!all.length) { svg.innerHTML = '<text x="20" y="40">没有数据</text>'; return; }
+  const days = [...new Set(all.map(p => p.day))].sort((a, b) => a - b);
+  const X = t => 26 + (days.indexOf(t) / Math.max(1, days.length - 1)) * 780;
+  const Y = v => 95 - v * 40;
   let s = "";
   for (const g of [-2, -1, 0, 1, 2])
-    s += `<line x1="30" x2="860" y1="${Y(g)}" y2="${Y(g)}" stroke="#eee"/><text x="2" y="${Y(g)+3}">${g>0?"+"+g:g}</text>`;
-  const line = (series, color) => series.length ?
-    `<polyline fill="none" stroke="${color}" stroke-width="2" points="${series.map(p => X(p.day)+","+Y(p.valence)).join(" ")}"/>` +
-    series.map(p => `<circle cx="${X(p.day)}" cy="${Y(p.valence)}" r="2.5" fill="${color}"><title>${new Date(p.day*1000).toLocaleDateString()} 效价 ${p.valence}（${p.n}条）</title></circle>`).join("") : "";
-  s += line(d.expose, "#d85c5c") + line(d.engage, "#45b880");
+    s += `<line x1="26" x2="806" y1="${Y(g)}" y2="${Y(g)}" stroke="${g === 0 ? "#dcdbd6" : "#f1f0ec"}"/><text x="4" y="${Y(g) + 3}">${g > 0 ? "+" + g : g}</text>`;
+  const first = days[0], last = days[days.length - 1];
+  const dstr = t => { const D = new Date(t * 1000); return `${D.getMonth() + 1}.${D.getDate()}`; };
+  s += `<text x="26" y="186">${dstr(first)}</text><text x="790" y="186">${dstr(last)}</text>`;
+  const mkPath = (series, color, label) => {
+    if (!series.length) return "";
+    const pts = series.map(p => [X(p.day), Y(p.valence)]);
+    let path = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) path += `L${pts[i][0]},${pts[i][1]}`;
+    const end = pts[pts.length - 1];
+    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>` +
+           `<text x="${Math.min(end[0] + 6, 820)}" y="${end[1] + 3}" style="fill:${color};font-weight:600">${label}</text>`;
+  };
+  s += mkPath(d.expose, C_FEED, "投喂") + mkPath(d.engage, C_PICK, "选择");
   svg.innerHTML = s;
-  const last = d.engage[d.engage.length - 1];
-  if (last) {
-    const mix = last.mix.map((v, i) => [v, d.emotions[i]]).sort((a, b) => b[0] - a[0]).slice(0, 4)
-      .filter(x => x[0] > 0.02).map(([v, n]) => `${n} ${(v*100).toFixed(0)}%`).join(" · ");
-    document.getElementById("emomix").textContent = "你最近点开内容的情绪构成：" + mix;
-  }
 }
+document.getElementById("chart").addEventListener("mousemove", e => {
+  if (!curveData) return;
+  const tip = document.getElementById("tip");
+  const r = e.currentTarget.getBoundingClientRect();
+  const mx = (e.clientX - r.left) / r.width * 860, my = (e.clientY - r.top) / r.height * 190;
+  let best = null;
+  const all = [...new Set([...curveData.expose, ...curveData.engage].map(p => p.day))].sort((a, b) => a - b);
+  const X = t => 26 + (all.indexOf(t) / Math.max(1, all.length - 1)) * 780;
+  const Y = v => 95 - v * 40;
+  for (const [series, name] of [[curveData.expose, "投喂"], [curveData.engage, "选择"]])
+    for (const p of series) {
+      const dx = X(p.day) - mx, dy = Y(p.valence) - my, dd = dx * dx + dy * dy;
+      if (!best || dd < best.dd) best = { dd, p, name };
+    }
+  if (best && best.dd < 900) {
+    const D = new Date(best.p.day * 1000);
+    tip.textContent = `${D.getMonth() + 1}.${D.getDate()} ${best.name} 效价${best.p.valence} ${best.p.n}条`;
+    tip.style.left = e.clientX - r.left + 12 + "px";
+    tip.style.top = e.clientY - r.top - 8 + "px";
+    tip.style.display = "block";
+  } else tip.style.display = "none";
+});
+document.getElementById("chart").addEventListener("mouseleave", () => document.getElementById("tip").style.display = "none");
+
+// ---------- 词云：中心向外螺旋堆叠 ----------
+const valColor = v => {
+  const t = Math.max(-2, Math.min(2, v)) / 2;
+  const mix = (a, b, k) => Math.round(a + (b - a) * k);
+  const mid = [122, 121, 117], pos = [42, 120, 214], neg = [194, 58, 57];
+  const c = t >= 0 ? [mix(mid[0], pos[0], t), mix(mid[1], pos[1], t), mix(mid[2], pos[2], t)]
+                   : [mix(mid[0], neg[0], -t), mix(mid[1], neg[1], -t), mix(mid[2], neg[2], -t)];
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+};
 async function loadCloud(days) {
   const d = await (await fetch(`/wordcloud?days=${days}&source=engage`)).json();
-  const el = document.getElementById("cloud");
-  if (!d.words.length) { el.innerHTML = '<p class="muted">窗口内没有数据。</p>'; return; }
-  const max = d.words[0].n;
-  el.innerHTML = d.words.map(w =>
-    `<span style="font-size:${12 + 22 * Math.sqrt(w.n / max)}px;color:${valColor(w.valence)}" title="出现${w.n}次·效价${w.valence}">${w.w}</span>`).join("");
+  const cv = document.getElementById("cloudc");
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth || 860, H = 380;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+  if (!d.words.length) { ctx.fillStyle = "#8a897f"; ctx.font = "13px system-ui"; ctx.fillText("没有数据", 20, 40); return; }
+  const max = d.words[0].n, cx = W / 2, cy = H / 2;
+  const placed = [];
+  const collide = (x, y, w, h) => x < 2 || y < 2 || x + w > W - 2 || y + h > H - 2 ||
+    placed.some(r => x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 3 && y + h + 3 > r.y);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const wd of d.words) {
+    const size = Math.round(13 + 34 * Math.sqrt(wd.n / max));
+    const vert = rnd() < 0.22 && wd.w.length <= 4;
+    ctx.font = `${size >= 26 ? 600 : 400} ${size}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+    const m = ctx.measureText(wd.w);
+    const tw = vert ? size * 1.1 : m.width, th = vert ? m.width : size * 1.15;
+    let px = null, py = null;
+    for (let i = 0; i < 900; i++) {
+      const a = 0.35 * i, rr = 2.2 * a;
+      const x = cx + rr * Math.cos(a + rnd() * .3) - tw / 2, y = cy + rr * 0.52 * Math.sin(a + rnd() * .3) - th / 2;
+      if (!collide(x, y, tw, th)) { px = x; py = y; break; }
+    }
+    if (px === null) continue;
+    placed.push({ x: px, y: py, w: tw, h: th });
+    ctx.fillStyle = valColor(wd.valence);
+    if (vert) {
+      ctx.save();
+      ctx.translate(px + size * 0.28, py + 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(wd.w, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(wd.w, px, py + th * 0.82);
+    }
+  }
 }
-async function loadPro(days) {
-  const d = await (await fetch(`/pro_content?days=${days}`)).json();
-  const fmt = it => `<li>${it.title}<span class="meta">${it.up} · ${it.topic}` +
-    (it.dur ? ` · 看了${Math.round(it.dwell/60)}/${Math.round(it.dur/60)}分钟` : "") + `</span></li>`;
-  document.getElementById("pro-unfin").innerHTML = d.unfinished.map(fmt).join("") || '<p class="muted">没有未看完的。</p>';
-  document.getElementById("pro-fin").innerHTML = d.finished.map(fmt).join("") || '<p class="muted">还没有看完的。</p>';
+
+// ---------- 新的兴趣 ----------
+async function loadNew() {
+  const d = await (await fetch("/new_interests")).json();
+  const el = document.getElementById("newint");
+  if (!d.interests.length) { el.innerHTML = '<li class="empty">暂无</li>'; return; }
+  el.innerHTML = d.interests.map(x =>
+    `<li><span class="ni-topic">${esc(x.topic)}</span><span class="ni-share">${(x.share * 100).toFixed(0)}%↑</span>` +
+    (x.items.length ? `<div class="meta">${x.items.map(titleHtml).join(" · ")}</div>` : "") + `</li>`).join("");
 }
-function winButtons(id, cb) {
+
+// ---------- 专业内容 ----------
+async function loadPro() {
+  const d = await (await fetch("/pro_content?days=90")).json();
+  const fmt = it => `<li>${titleHtml(it)}<div class="meta">${esc(it.up)} · ${esc(it.topic)}` +
+    (it.dur ? ` · 看了${Math.round(it.dwell / 60)}/${Math.round(it.dur / 60)}分钟` : "") + `</div></li>`;
+  document.getElementById("unfin").innerHTML = d.unfinished.map(fmt).join("") || '<li class="empty">没有</li>';
+  document.getElementById("fin").innerHTML = d.finished.map(fmt).join("") || '<li class="empty">没有</li>';
+}
+
+function seg(id, attr, cb) {
   const el = document.getElementById(id);
   el.addEventListener("click", e => {
     if (e.target.tagName !== "BUTTON") return;
     el.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target));
-    cb(Number(e.target.dataset.d));
+    cb(e.target.dataset[attr]);
   });
 }
-async function loadProfile() {
-  const d = await (await fetch("/profile")).json();
-  document.getElementById("meta").textContent = `（${d.n_events} 个事件 · 引擎: ${d.classifier}${d.emotion_on ? "+情绪" : ""}）`;
-  const topN = (dist, n) => dist.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, n).filter(x => x[0] > 0.005);
-  const render = (elId, dist, cls) => {
-    const el = document.getElementById(elId);
-    el.innerHTML = "";
-    for (const [v, i] of topN(dist, 12))
-      el.insertAdjacentHTML("beforeend",
-        `<div class="bar-row"><span class="name">${d.topics[i]}</span>
-         <div class="bar-wrap"><div class="bar ${cls}" style="width:${Math.min(100, v * 250)}%"></div></div>
-         <span class="pct">${(v * 100).toFixed(1)}%</span></div>`);
-    if (!el.innerHTML) el.innerHTML = '<p class="muted">还没有足够数据。</p>';
-  };
-  render("long", d.long, "");
-  render("short", d.short, "short");
-  const gaps = d.topics.map((t, i) => [d.expose[i] - d.long[i], i]).sort((a, b) => b[0] - a[0]);
-  const gapEl = document.getElementById("gap");
-  const fmt = ([g, i], label) => `<div class="bar-row"><span class="name">${d.topics[i]}</span>
-      <div class="bar-wrap"><div class="bar gap" style="width:${Math.min(100, Math.abs(g) * 400)}%"></div></div>
-      <span class="pct">${label}</span></div>`;
-  for (const x of gaps.slice(0, 4)) if (x[0] > 0.01) gapEl.insertAdjacentHTML("beforeend", fmt(x, "被投喂↑"));
-  for (const x of gaps.slice(-4).reverse()) if (x[0] < -0.01) gapEl.insertAdjacentHTML("beforeend", fmt(x, "你主动↑"));
-  const dr = document.getElementById("drivers");
-  for (const [topic, items] of Object.entries(d.drivers))
-    dr.insertAdjacentHTML("beforeend", `<div class="bar-row"><span class="name">${topic}</span></div>
-      <div class="drivers">${items.map(x => `${x.title}（${x.up}）`).join("<br>")}</div>`);
-}
-loadProfile(); loadEmotion(); loadCloud(30); loadPro(30);
-winButtons("cloudwin", loadCloud);
-winButtons("prowin", loadPro);
+seg("ecat", "c", c => loadEmotion(c));
+seg("cwin", "d", d => loadCloud(Number(d)));
+loadEmotion("all"); loadCloud(30); loadNew(); loadPro();
 </script>
