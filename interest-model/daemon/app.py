@@ -58,6 +58,21 @@ class Classifier:
             except Exception:
                 pass
             self.mode = "embedding"
+            try:
+                yt_t = os.path.join(model_dir, "yt_topic_clf.joblib")
+                yt_e = os.path.join(model_dir, "yt_emotion_clf.joblib")
+                if os.path.exists(yt_t):
+                    self.yt_enc = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                                                      device="cuda" if self._has_cuda() else "cpu")
+                    self.yt_clf = joblib.load(yt_t)
+                    self.yt_emo = joblib.load(yt_e) if os.path.exists(yt_e) else None
+                    self.yt = True
+                    print("[classifier] youtube 多语言双头已加载")
+                else:
+                    self.yt = False
+            except Exception as e2:
+                print("[warn] youtube 模型加载失败:", str(e2)[:100])
+                self.yt = False
         except Exception as e:
             print("[warn] 嵌入分类不可用，回落 n-gram（无情绪功能）:", str(e)[:100])
             from sklearn.feature_extraction.text import HashingVectorizer
@@ -76,13 +91,24 @@ class Classifier:
         except Exception:
             return False
 
-    def both(self, texts):
-        """返回 (主题proba, 情绪proba或None)"""
+    def both(self, texts, sites=None):
+        """返回 (主题proba, 情绪proba或None)；youtube 事件路由到多语言模型"""
         if self.mode == "embedding":
-            X = self.enc.encode(texts, batch_size=64, normalize_embeddings=True, show_progress_bar=False)
-            tp = self.clf.predict_proba(X)
-            ep = self.emo_clf.predict_proba(X) if self.emo_clf is not None else None
-            return tp, ep
+            n = len(texts)
+            yt_idx = [i for i in range(n) if sites and getattr(self, "yt", False) and sites[i] == "youtube"]
+            zh_idx = [i for i in range(n) if i not in set(yt_idx)]
+            tp = np.zeros((n, N)); ep = np.zeros((n, len(E_NAMES)))
+            if zh_idx:
+                X = self.enc.encode([texts[i] for i in zh_idx], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+                tp[zh_idx] = self.clf.predict_proba(X)
+                if self.emo_clf is not None:
+                    ep[zh_idx] = self.emo_clf.predict_proba(X)
+            if yt_idx:
+                Xy = self.yt_enc.encode([texts[i] for i in yt_idx], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+                tp[yt_idx] = self.yt_clf.predict_proba(Xy)
+                if self.yt_emo is not None:
+                    ep[yt_idx] = self.yt_emo.predict_proba(Xy)
+            return tp, (ep if self.emo_clf is not None else None)
         z = (self.vec.transform(texts) @ self.W.T) + self.B
         z = np.asarray(z)
         e = np.exp(z - z.max(axis=1, keepdims=True))
@@ -349,7 +375,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/events":
             evs = (data if isinstance(data, list) else [data])[:1000]
             texts = [str(e.get("t", ""))[:120] + " " + str(e.get("u", ""))[:40] for e in evs]
-            tps, eps = CLF.both(texts)
+            tps, eps = CLF.both(texts, [e.get("site", "") for e in evs])
             for i, e in enumerate(evs):
                 ST.update(tps[i], eps[i] if eps is not None else None, e)
             ST.flush()
