@@ -4,7 +4,7 @@
 安全: 只绑 127.0.0.1；写接口需令牌（首次运行自动生成，存 ~/.interest-model/token）；
      跨域仅放行 bilibili/youtube 来源；读接口不发 CORS 头（外站页面拿不到响应）。
 事件: 插件 POST /events，头带 X-IM-Token。事件字段:
-     {t:标题, u:作者, type:"expose"|"click"|"watch", dwell:秒, dur:视频总长秒, id:视频id, site, ts}
+     {t:标题, u:作者, type:"expose"|"click"|"watch", dwell:秒, dur:视频总长秒, id:视频id, pic:封面url, site, ts}
 仪表盘: 浏览器打开 http://127.0.0.1:<port>/
 """
 import argparse, json, os, re, secrets, sqlite3, time, threading
@@ -101,7 +101,11 @@ class State:
         self.db = sqlite3.connect(DB_PATH, check_same_thread=False)
         self.db.execute("""CREATE TABLE IF NOT EXISTS events(
             ts REAL, site TEXT, vid TEXT, title TEXT, up TEXT, etype TEXT,
-            dwell REAL, dur REAL, topic INT, emo INT, valence REAL)""")
+            dwell REAL, dur REAL, topic INT, emo INT, valence REAL, pic TEXT)""")
+        try:
+            self.db.execute("ALTER TABLE events ADD COLUMN pic TEXT")
+        except Exception:
+            pass
         self.db.execute("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)")
         row = self.db.execute("SELECT v FROM kv WHERE k='profile'").fetchone()
         if row:
@@ -131,10 +135,11 @@ class State:
                 self.long += w * tp
             emo = int(ep.argmax()) if ep is not None else -1
             val = float(ep @ E_VAL) if ep is not None else None
-            self.db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            self.db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                             (now, ev.get("site", "?"), str(ev.get("id", ""))[:30],
                              str(ev.get("t", ""))[:120], str(ev.get("u", ""))[:40], etype,
-                             dwell, float(ev.get("dur", 0)), int(tp.argmax()), emo, val))
+                             dwell, float(ev.get("dur", 0)), int(tp.argmax()), emo, val,
+                             str(ev.get("pic", ""))[:200]))
 
     def flush(self):
         with self.lock:
@@ -223,15 +228,20 @@ def pro_content(days):
     """浏览过的专业内容：看完(≥80%或观看≥10分钟) / 未看完。"""
     since = time.time() - days * 86400
     rows = ST.db.execute(
-        "SELECT ts, vid, title, up, dwell, dur, topic, site FROM events "
+        "SELECT ts, vid, title, up, dwell, dur, topic, site, pic FROM events "
         "WHERE ts>=? AND etype!='expose' ORDER BY ts DESC LIMIT 2000", (since,)).fetchall()
     fin, unfin = [], []
     seen = set()
-    for ts, vid, title, up, dwell, dur, topic, site in rows:
+    group_of = {}
+    for gname, ls in TAX["groups"].items():
+        for l in ls:
+            group_of[LEAVES.index(l)] = gname
+    for ts, vid, title, up, dwell, dur, topic, site, pic in rows:
         if topic not in PRO_TOPICS or (vid, title) in seen:
             continue
         seen.add((vid, title))
         item = {"ts": ts, "id": vid, "title": title, "up": up, "topic": LEAVES[topic],
+                "group": group_of.get(topic, ""), "pic": pic or "",
                 "dwell": round(dwell), "dur": round(dur),
                 "site": site}
         if dur > 0:

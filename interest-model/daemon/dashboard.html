@@ -30,6 +30,18 @@
   ul.items li { padding: 4px 0; border-bottom: 1px solid #f1f0ec; line-height: 1.45; }
   ul.items a { color: #1a5fb4; text-decoration: none; }
   ul.items a:hover { text-decoration: underline; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 10px; }
+  .card { display: flex; gap: 10px; border: 1px solid #eceae5; border-radius: 6px; padding: 8px; background: #fff; }
+  .card .thumb { width: 128px; height: 80px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: #f1f0ec; }
+  .card .body { min-width: 0; display: flex; flex-direction: column; }
+  .card .t { font-size: 13px; line-height: 1.4; color: #1a5fb4; text-decoration: none; font-weight: 500;
+             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .t:hover { text-decoration: underline; }
+  .card .m { color: #8a897f; font-size: 11px; margin-top: 3px; }
+  .card .grow { flex: 1; }
+  .prog { height: 3px; background: #eceae5; border-radius: 2px; margin-top: 6px; }
+  .prog i { display: block; height: 100%; border-radius: 2px; background: #eb6834; }
+  .prog i.done { background: #1baf7a; }
   .meta { color: #8a897f; font-size: 11px; }
   .ni-topic { font-weight: 600; }
   .ni-share { color: #2a78d6; font-size: 12px; margin-left: 6px; }
@@ -58,11 +70,9 @@
 <h2>新的兴趣</h2>
 <ul class="items" id="newint"></ul>
 
-<h2>专业内容</h2>
-<div class="cols">
-  <div><div class="sub">没看完</div><ul class="items" id="unfin"></ul></div>
-  <div><div class="sub">看完</div><ul class="items" id="fin"></ul></div>
-</div>
+<h2>专业内容 <span class="seg" id="ptab"><button data-t="unfin" class="on">没看完</button><button data-t="fin">看完</button></span>
+  <span class="seg" id="pcat"></span></h2>
+<div class="cards" id="procards"></div>
 
 <script>
 const C_FEED = "#eb6834", C_PICK = "#2a78d6";
@@ -148,14 +158,19 @@ async function loadCloud(days) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
   if (!d.words.length) { ctx.fillStyle = "#8a897f"; ctx.font = "13px system-ui"; ctx.fillText("没有数据", 20, 40); return; }
-  const max = d.words[0].n, cx = W / 2, cy = H / 2;
+  const ns = d.words.map(w => w.n);
+  const nMax = ns[0], nMin = ns[ns.length - 1];
+  const tOf = n => nMax > nMin ? (n - nMin) / (nMax - nMin) : 0.5;
+  const tMed = tOf(ns[Math.floor(ns.length / 2)]);
+  const gamma = (tMed > 0 && tMed < 1) ? Math.min(3, Math.max(0.3, Math.log(0.5) / Math.log(tMed))) : 1;
+  const cx = W / 2, cy = H / 2;
   const placed = [];
   const collide = (x, y, w, h) => x < 2 || y < 2 || x + w > W - 2 || y + h > H - 2 ||
     placed.some(r => x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 3 && y + h + 3 > r.y);
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (const wd of d.words) {
-    const size = Math.round(13 + 34 * Math.sqrt(wd.n / max));
+    const size = Math.round(13 + 34 * Math.pow(tOf(wd.n), gamma));
     const vert = rnd() < 0.22 && wd.w.length <= 4;
     ctx.font = `${size >= 26 ? 600 : 400} ${size}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
     const m = ctx.measureText(wd.w);
@@ -192,13 +207,50 @@ async function loadNew() {
 }
 
 // ---------- 专业内容 ----------
+let proData = null, proTab = "unfin", proCat = "全部";
 async function loadPro() {
-  const d = await (await fetch("/pro_content?days=90")).json();
-  const fmt = it => `<li>${titleHtml(it)}<div class="meta">${esc(it.up)} · ${esc(it.topic)}` +
-    (it.dur ? ` · 看了${Math.round(it.dwell / 60)}/${Math.round(it.dur / 60)}分钟` : "") + `</div></li>`;
-  document.getElementById("unfin").innerHTML = d.unfinished.map(fmt).join("") || '<li class="empty">没有</li>';
-  document.getElementById("fin").innerHTML = d.finished.map(fmt).join("") || '<li class="empty">没有</li>';
+  proData = await (await fetch("/pro_content?days=90")).json();
+  renderProCats();
+  renderPro();
 }
+function renderProCats() {
+  const items = [...proData.unfinished, ...proData.finished];
+  const cnt = {};
+  for (const it of items) cnt[it.group] = (cnt[it.group] || 0) + 1;
+  const cats = ["全部", ...Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])];
+  const el = document.getElementById("pcat");
+  el.innerHTML = cats.map(c =>
+    `<button data-g="${c}" class="${c === proCat ? "on" : ""}">${c}${c === "全部" ? "" : " " + cnt[c]}</button>`).join("");
+}
+function renderPro() {
+  const list = (proTab === "unfin" ? proData.unfinished : proData.finished)
+    .filter(it => proCat === "全部" || it.group === proCat);
+  const el = document.getElementById("procards");
+  if (!list.length) { el.innerHTML = '<div class="empty">没有</div>'; return; }
+  el.innerHTML = list.map(it => {
+    const url = linkOf(it.site, it.id);
+    const pct = it.dur > 0 ? Math.min(100, Math.round(it.dwell / it.dur * 100)) : (proTab === "fin" ? 100 : 0);
+    const D = new Date(it.ts * 1000);
+    return `<div class="card">` +
+      (it.pic ? `<img class="thumb" src="${esc(it.pic)}@256w_160h_1c" referrerpolicy="no-referrer" loading="lazy">` : `<div class="thumb"></div>`) +
+      `<div class="body"><a class="t" ${url ? `href="${url}" target="_blank"` : ""}>${esc(it.title)}</a>` +
+      `<div class="m">${esc(it.up)} · ${esc(it.topic)} · ${D.getMonth() + 1}.${D.getDate()}` +
+      (it.dur ? ` · ${Math.round(it.dwell / 60)}/${Math.round(it.dur / 60)}分钟` : "") + `</div>` +
+      `<div class="grow"></div><div class="prog"><i class="${pct >= 80 ? "done" : ""}" style="width:${pct}%"></i></div></div></div>`;
+  }).join("");
+}
+document.getElementById("ptab").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#ptab button").forEach(b => b.classList.toggle("on", b === e.target));
+  proTab = e.target.dataset.t;
+  renderPro();
+});
+document.getElementById("pcat").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  proCat = e.target.dataset.g;
+  renderProCats();
+  renderPro();
+});
 
 function seg(id, attr, cb) {
   const el = document.getElementById(id);
