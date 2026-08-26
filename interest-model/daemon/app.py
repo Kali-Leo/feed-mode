@@ -1,12 +1,14 @@
 """个人兴趣模型 · 本地服务（完整轨）
 
 运行: python3 app.py [--port 21456]
-安全: 只绑 127.0.0.1；写接口需令牌（首次运行自动生成，打印在控制台并存 ~/.interest-model/token）；
+安全: 只绑 127.0.0.1；写接口需令牌（首次运行自动生成，存 ~/.interest-model/token）；
      跨域仅放行 bilibili/youtube 来源；读接口不发 CORS 头（外站页面拿不到响应）。
-浏览器端用法: 插件把事件 POST 到 http://127.0.0.1:<port>/events，头带 X-IM-Token。
+事件: 插件 POST /events，头带 X-IM-Token。事件字段:
+     {t:标题, u:作者, type:"expose"|"click"|"watch", dwell:秒, dur:视频总长秒, id:视频id, site, ts}
 仪表盘: 浏览器打开 http://127.0.0.1:<port>/
 """
-import argparse, json, os, secrets, sqlite3, time, threading
+import argparse, json, os, re, secrets, sqlite3, time, threading
+from urllib.parse import urlparse, parse_qs
 import numpy as np
 
 BASE_DIR = os.path.expanduser("~/.interest-model")
@@ -15,8 +17,13 @@ TOKEN_PATH = os.path.join(BASE_DIR, "token")
 DB_PATH = os.path.join(BASE_DIR, "events.db")
 HERE = os.path.dirname(os.path.abspath(__file__))
 TAX = json.load(open(os.path.join(HERE, "..", "taxonomy.json")))
+EMO = json.load(open(os.path.join(HERE, "..", "emotions.json")))
 LEAVES = [l for g in TAX["groups"].values() for l in g]
+E_NAMES = [e["name"] for e in EMO["emotions"]]
+E_VAL = np.array([e["valence"] for e in EMO["emotions"]])
 N = len(LEAVES)
+PRO_GROUPS = {"科技数码", "知识学习", "财经商业", "纪实深度"}
+PRO_TOPICS = {LEAVES.index(l) for g in PRO_GROUPS for l in TAX["groups"][g]}
 ALLOWED_ORIGINS = {"https://www.bilibili.com", "https://www.youtube.com"}
 
 if os.path.exists(TOKEN_PATH):
@@ -25,11 +32,18 @@ else:
     TOKEN = secrets.token_urlsafe(24)
     open(TOKEN_PATH, "w").write(TOKEN)
 
-# ---------- 分类器：优先语义嵌入，缺依赖时回落字符 n-gram ----------
+try:
+    WORD_VAL = json.load(open(os.path.join(HERE, "models", "word_valence.json")))
+except Exception:
+    WORD_VAL = {}
+
+
 class Classifier:
+    """编码一次，主题/情绪两个头共享嵌入；缺依赖时回落 n-gram（无情绪头）。"""
+
     def __init__(self):
-        self.mode = None
         model_dir = os.path.join(HERE, "models")
+        self.emo_clf = None
         try:
             os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
             for k in ["http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]:
@@ -39,16 +53,20 @@ class Classifier:
             self.enc = SentenceTransformer("BAAI/bge-small-zh-v1.5",
                                            device="cuda" if self._has_cuda() else "cpu")
             self.clf = joblib.load(os.path.join(model_dir, "topic_clf_emb.joblib"))
+            try:
+                self.emo_clf = joblib.load(os.path.join(model_dir, "emotion_clf_emb.joblib"))
+            except Exception:
+                pass
             self.mode = "embedding"
         except Exception as e:
-            print("[warn] 嵌入分类不可用，回落 n-gram:", str(e)[:100])
+            print("[warn] 嵌入分类不可用，回落 n-gram（无情绪功能）:", str(e)[:100])
             from sklearn.feature_extraction.text import HashingVectorizer
             d = np.load(os.path.join(model_dir, "topic_model_daemon.npz"))
             self.W, self.B, dims = d["w"], d["b"], int(d["dims"])
             self.vec = HashingVectorizer(analyzer="char", ngram_range=(1, 3),
                                          n_features=dims, alternate_sign=False, norm="l2")
             self.mode = "ngram"
-        print(f"[classifier] mode={self.mode}")
+        print(f"[classifier] mode={self.mode} emotion={'on' if self.emo_clf is not None else 'off'}")
 
     @staticmethod
     def _has_cuda():
@@ -58,26 +76,32 @@ class Classifier:
         except Exception:
             return False
 
-    def proba(self, texts):
+    def both(self, texts):
+        """返回 (主题proba, 情绪proba或None)"""
         if self.mode == "embedding":
             X = self.enc.encode(texts, batch_size=64, normalize_embeddings=True, show_progress_bar=False)
-            return self.clf.predict_proba(X)
+            tp = self.clf.predict_proba(X)
+            ep = self.emo_clf.predict_proba(X) if self.emo_clf is not None else None
+            return tp, ep
         z = (self.vec.transform(texts) @ self.W.T) + self.B
         z = np.asarray(z)
         e = np.exp(z - z.max(axis=1, keepdims=True))
-        return e / e.sum(axis=1, keepdims=True)
+        return e / e.sum(axis=1, keepdims=True), None
 
-# ---------- 画像状态（数学与 eval/profile_engine.py 一致） ----------
+
 HL_SHORT, HL_LONG = 7 * 86400.0, 90 * 86400.0
+
 
 class State:
     def __init__(self):
         self.lock = threading.Lock()
         self.short = np.zeros(N); self.long = np.zeros(N); self.expose = np.zeros(N)
         self.ts = None
-        self.prefs = {}  # topic -> -2..2 申明偏好
+        self.prefs = {}
         self.db = sqlite3.connect(DB_PATH, check_same_thread=False)
-        self.db.execute("CREATE TABLE IF NOT EXISTS events(ts REAL, site TEXT, title TEXT, up TEXT, etype TEXT, dwell REAL, topic INT)")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS events(
+            ts REAL, site TEXT, vid TEXT, title TEXT, up TEXT, etype TEXT,
+            dwell REAL, dur REAL, topic INT, emo INT, valence REAL)""")
         self.db.execute("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)")
         row = self.db.execute("SELECT v FROM kv WHERE k='profile'").fetchone()
         if row:
@@ -91,19 +115,29 @@ class State:
             self.short *= 0.5 ** (dt / HL_SHORT)
             self.long *= 0.5 ** (dt / HL_LONG)
             self.expose *= 0.5 ** (dt / HL_LONG)
-        self.ts = now
+        self.ts = max(self.ts or 0, now)
 
-    def update(self, proba, etype, dwell, now, site, title, up):
+    def update(self, tp, ep, ev):
+        now = float(ev.get("ts", time.time()))
+        etype = ev.get("type", "expose")
+        dwell = float(ev.get("dwell", 0))
         with self.lock:
             self._decay(now)
             w = 1.0 if etype == "expose" else (5.0 if etype == "click" else 5.0 + min(dwell / 60.0, 10.0))
             if etype == "expose":
-                self.expose += proba
+                self.expose += tp
             else:
-                self.short += w * proba
-                self.long += w * proba
-            self.db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?)",
-                            (now, site, title[:120], up[:40], etype, dwell, int(proba.argmax())))
+                self.short += w * tp
+                self.long += w * tp
+            emo = int(ep.argmax()) if ep is not None else -1
+            val = float(ep @ E_VAL) if ep is not None else None
+            self.db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                            (now, ev.get("site", "?"), str(ev.get("id", ""))[:30],
+                             str(ev.get("t", ""))[:120], str(ev.get("u", ""))[:40], etype,
+                             dwell, float(ev.get("dur", 0)), int(tp.argmax()), emo, val))
+
+    def flush(self):
+        with self.lock:
             self.db.execute("REPLACE INTO kv VALUES('profile',?)", (json.dumps(
                 {"short": self.short.tolist(), "long": self.long.tolist(),
                  "expose": self.expose.tolist(), "ts": self.ts, "prefs": self.prefs}),))
@@ -115,14 +149,92 @@ class State:
             return (v / s if s > 0 else v).tolist()
         return {"short": nz(self.short), "long": nz(self.long), "expose": nz(self.expose)}
 
+
 CLF = Classifier()
 ST = State()
 
-# ---------- HTTP ----------
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-def dashboard_html():
-    return open(os.path.join(HERE, "dashboard.html"), encoding="utf-8").read()
+
+def q_days(query, default=30):
+    try:
+        return max(1, min(3650, int(query.get("days", [default])[0])))
+    except Exception:
+        return default
+
+
+def emotion_series(days):
+    """按天聚合：投喂(曝光) vs 选择(点击/观看) 的平均效价与情绪构成。"""
+    since = time.time() - days * 86400
+    out = {}
+    for label, cond in [("expose", "etype='expose'"), ("engage", "etype!='expose'")]:
+        rows = ST.db.execute(
+            f"SELECT CAST(ts/86400 AS INT)*86400 AS day, AVG(valence), COUNT(*), emo "
+            f"FROM events WHERE ts>=? AND valence IS NOT NULL AND {cond} GROUP BY day, emo",
+            (since,)).fetchall()
+        days_map = {}
+        for day, avgv, n, emo in rows:
+            d = days_map.setdefault(day, {"n": 0, "vsum": 0.0, "mix": [0] * len(E_NAMES)})
+            d["n"] += n
+            d["vsum"] += avgv * n
+            if 0 <= emo < len(E_NAMES):
+                d["mix"][emo] += n
+        out[label] = [
+            {"day": day, "valence": round(d["vsum"] / d["n"], 3), "n": d["n"],
+             "mix": [round(x / d["n"], 3) for x in d["mix"]]}
+            for day, d in sorted(days_map.items())]
+    return {"emotions": E_NAMES, "valences": E_VAL.tolist(), **out}
+
+
+_STOP = set("的 了 我 你 他 她 它 是 在 有 和 与 就 都 也 又 还 这 那 什么 怎么 为什么 一个 我们 你们 他们 自己 没有 不是 可以 这个 那个 到底 竟然 居然 直接 真的 到底 如何 这样 那样 但是 因为 所以 如果 已经 现在 开始 最后 第一 第二 up 主 UP".split())
+
+
+def wordcloud(days, source):
+    since = time.time() - days * 86400
+    cond = "etype!='expose'" if source == "engage" else "etype='expose'"
+    rows = ST.db.execute(f"SELECT title, valence FROM events WHERE ts>=? AND {cond}", (since,)).fetchall()
+    import jieba
+    cnt, vals = {}, {}
+    for title, val in rows:
+        for w in set(jieba.lcut(title)):
+            if len(w) < 2 or w in _STOP or re.match(r"^[\d\W_a-zA-Z]+$", w):
+                continue
+            cnt[w] = cnt.get(w, 0) + 1
+            if val is not None:
+                vals.setdefault(w, []).append(val)
+    top = sorted(cnt.items(), key=lambda x: -x[1])[:80]
+    return {"days": days, "source": source, "words": [
+        {"w": w, "n": n,
+         "valence": round(WORD_VAL.get(w, float(np.mean(vals[w])) if w in vals else 0.0), 2)}
+        for w, n in top]}
+
+
+def pro_content(days):
+    """浏览过的专业内容：看完(≥80%或观看≥10分钟) / 未看完。"""
+    since = time.time() - days * 86400
+    rows = ST.db.execute(
+        "SELECT ts, vid, title, up, dwell, dur, topic, site FROM events "
+        "WHERE ts>=? AND etype!='expose' ORDER BY ts DESC LIMIT 2000", (since,)).fetchall()
+    fin, unfin = [], []
+    seen = set()
+    for ts, vid, title, up, dwell, dur, topic, site in rows:
+        if topic not in PRO_TOPICS or (vid, title) in seen:
+            continue
+        seen.add((vid, title))
+        item = {"ts": ts, "id": vid, "title": title, "up": up, "topic": LEAVES[topic],
+                "dwell": round(dwell), "dur": round(dur),
+                "site": site}
+        if dur > 0:
+            # 有时长信息：完成度 ≥80% 算看完；<80% 且确实看过（≥30s）算未看完
+            if dwell / dur >= 0.8:
+                fin.append(item)
+            elif dwell >= 30:
+                unfin.append(item)
+        elif dwell >= 600:
+            fin.append(item)  # 无时长信息但看了10分钟以上，视为认真看过
+        # 无时长且短观看：无法判断是否看完，不列入（避免"看了2/0分钟"式的误报）
+    return {"days": days, "finished": fin[:100], "unfinished": unfin[:100]}
+
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -151,14 +263,15 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == "/":
-            body = dashboard_html().encode()
+        u = urlparse(self.path)
+        query = parse_qs(u.query)
+        if u.path == "/":
+            body = open(os.path.join(HERE, "dashboard.html"), encoding="utf-8").read().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/profile":
-            # 只有本机同源（仪表盘）能读：不发 CORS 头，外站页面读不到响应
+        elif u.path == "/profile":
             d = ST.dists()
             top = np.argsort(d["long"])[::-1][:10]
             drivers = {}
@@ -171,8 +284,14 @@ class H(BaseHTTPRequestHandler):
             n_events = ST.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
             self._json({"topics": LEAVES, "groups": TAX["groups"], **d,
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
-                        "classifier": CLF.mode})
-        elif self.path == "/export":
+                        "classifier": CLF.mode, "emotion_on": CLF.emo_clf is not None})
+        elif u.path == "/emotion_series":
+            self._json(emotion_series(q_days(query, 60)))
+        elif u.path == "/wordcloud":
+            self._json(wordcloud(q_days(query, 30), query.get("source", ["engage"])[0]))
+        elif u.path == "/pro_content":
+            self._json(pro_content(q_days(query, 30)))
+        elif u.path == "/export":
             row = ST.db.execute("SELECT v FROM kv WHERE k='profile'").fetchone()
             self._json({"taxonomy_version": TAX["version"], "profile": json.loads(row[0]) if row else None})
         else:
@@ -189,28 +308,22 @@ class H(BaseHTTPRequestHandler):
             self._json({"error": "bad json"}, 400, cors=True)
             return
         if self.path == "/events":
-            evs = data if isinstance(data, list) else [data]
-            evs = evs[:500]
+            evs = (data if isinstance(data, list) else [data])[:1000]
             texts = [str(e.get("t", ""))[:120] + " " + str(e.get("u", ""))[:40] for e in evs]
-            probas = CLF.proba(texts)
-            now = time.time()
-            for e, p in zip(evs, probas):
-                ts = float(e.get("ts", now))
-                ST.update(p, e.get("type", "expose"), float(e.get("dwell", 0)), ts,
-                          e.get("site", "?"), str(e.get("t", "")), str(e.get("u", "")))
+            tps, eps = CLF.both(texts)
+            for i, e in enumerate(evs):
+                ST.update(tps[i], eps[i] if eps is not None else None, e)
+            ST.flush()
             self._json({"ok": True, "n": len(evs)}, cors=True)
         elif self.path == "/prefs":
             for k, v in data.items():
                 if k in LEAVES:
                     ST.prefs[k] = max(-2, min(2, float(v)))
-            with ST.lock:
-                ST.db.execute("REPLACE INTO kv VALUES('profile',?)", (json.dumps(
-                    {"short": ST.short.tolist(), "long": ST.long.tolist(),
-                     "expose": ST.expose.tolist(), "ts": ST.ts, "prefs": ST.prefs}),))
-                ST.db.commit()
+            ST.flush()
             self._json({"ok": True}, cors=True)
         else:
             self._json({"error": "not found"}, 404, cors=True)
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
