@@ -11,6 +11,10 @@
 
 [📦 安装](#-安装) · [🔑 API Key](#-api-key可选) · [🛡️ 隐私](#%EF%B8%8F-隐私) · [⚠️ 免责](#%EF%B8%8F-免责)
 
+<img src="docs/switchbar.png" width="620" alt="模式开关">
+
+<img src="docs/preview.png" width="840" alt="B站首页与模式开关（未登录状态截图）">
+
 </div>
 
 ## ✨ 功能
