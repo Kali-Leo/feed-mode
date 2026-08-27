@@ -63,9 +63,19 @@
   .ni-share { color: var(--blue); font-size: 12px; font-weight: 600; margin-left: 8px; }
   .empty { color: var(--ink-3); padding: 6px 0; }
   svg text { font-size: 10px; fill: var(--ink-3); }
+  .code-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 12px; color: var(--ink-2); }
+  .code-row code { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px;
+                   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--ink); }
+  .code-row button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 10px;
+                     font-size: 12px; cursor: pointer; color: var(--ink-2); }
+  .code-row button:hover { color: var(--ink); }
+  .code-row .muted { color: var(--ink-3); }
 </style>
 
 <section class="panel">
+<div class="code-row">连接码 <code id="imtoken">__IM_TOKEN__</code> <button id="copytoken">复制</button>
+  <span class="muted">粘贴到浏览器插件开关条的 🔗 里</span></div>
+
 <h2>内容情绪
   <span class="seg" id="ecat">
     <button data-c="all" class="on">全部</button><button data-c="pro">专业</button><button data-c="ent">娱乐</button><button data-c="gent">精选娱乐</button>

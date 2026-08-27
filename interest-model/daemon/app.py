@@ -329,7 +329,10 @@ class H(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         query = parse_qs(u.query)
         if u.path == "/":
-            body = open(os.path.join(HERE, "dashboard.html"), encoding="utf-8").read().encode()
+            html = open(os.path.join(HERE, "dashboard.html"), encoding="utf-8").read()
+            # 连接码直接渲染进本地页面：跨站脚本读不到本服务的响应，安全等同 /profile
+            html = html.replace("__IM_TOKEN__", TOKEN)
+            body = html.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()

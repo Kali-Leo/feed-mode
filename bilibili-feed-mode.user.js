@@ -2,7 +2,7 @@
 // @name         B站首页 娱乐/专业 模式切换
 // @name:en      Bilibili Feed Mode: Learn / Feel-good / Fun
 // @namespace    leo.bilibili.feedmode
-// @version      2.0.3
+// @version      2.0.4
 // @description  内置本地 AI 小模型 + 大模型复核，把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与哔哩哔哩无关联。
 // @description:en  Filter your Bilibili home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box - no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with Bilibili.
 // @match        https://www.bilibili.com/
@@ -21,6 +21,8 @@
   "use strict";
   if (window.__bfm) return; // 防止重复注入
 
+  const ZH = (navigator.language || "").toLowerCase().startsWith("zh"); // 界面语言跟随浏览器
+
   // ================= 个人兴趣模型回传（默认关闭） =================
   // 只有在开关条的 🔗 里填了连接码，下面这些才会做事；没填时全部空转，脚本行为与不带此功能时一致。
   // 目标固定为本机 127.0.0.1 的兴趣服务（interest-model/daemon），发的是标题、UP主名、视频 id、
@@ -29,6 +31,21 @@
   const IM_TOKEN = (localStorage.getItem("bfm_im_token") || "").trim();
   const imQueue = [];
   let imTimer = null;
+  // 连接状态：off 未启用 / ok 正常 / bad 连接码不对 / offline 本机程序没开
+  let imState = IM_TOKEN ? "pending" : "off";
+  let imSent = 0, imFails = 0, imWarned = false;
+  const imOnState = [];
+  function imSetState(s) {
+    if (imState === s) return;
+    imState = s;
+    for (const fn of imOnState) fn(s);
+    // 连接码不对是配置错误，用户不改就永远收不到数据，必须说一次
+    if (s === "bad" && !imWarned) {
+      imWarned = true;
+      alert(ZH ? "兴趣程序的连接码不对，浏览记录没有送达。请点开关条上的 🔗 重新粘贴（程序启动时会打印新的连接码）。"
+               : "The interest service rejected the connection code, so nothing is being recorded. Click 🔗 on the switch bar and paste the current code (the service prints it on startup).");
+    }
+  }
   function imFlush() {
     imTimer = null;
     if (!IM_TOKEN || !imQueue.length) return;
@@ -38,7 +55,20 @@
       headers: { "Content-Type": "application/json", "X-IM-Token": IM_TOKEN },
       body: JSON.stringify(batch),
       keepalive: true,
-    }).catch(() => {}); // 本机服务没开就静默丢弃，不打扰用户
+    }).then((r) => {
+      if (r.ok) { imSent += batch.length; imFails = 0; imSetState("ok"); return; }
+      // 403 = 连接码不对：留着也没用，丢弃并提示
+      if (r.status === 403) { imSetState("bad"); return; }
+      imQueue.unshift(...batch);
+      imSetState("offline");
+    }).catch(() => {
+      // 本机程序没开：事件放回队列，下次再试，不丢数据
+      imQueue.unshift(...batch);
+      if (imQueue.length > 1000) imQueue.splice(0, imQueue.length - 1000);
+      imFails++;
+      imSetState("offline");
+      if (!imTimer) imTimer = setTimeout(imFlush, Math.min(60000, 5000 * Math.pow(2, Math.min(imFails, 4))));
+    });
   }
   function imReport(ev) {
     if (!IM_TOKEN) return;
@@ -113,7 +143,6 @@
   const API_URL = localStorage.getItem("bfm_api_url") || "https://api.deepseek.com/chat/completions";
   const MODEL = localStorage.getItem("bfm_model") || "deepseek-v4-flash"; // 旧名 deepseek-chat 已于 2026-07 退役
   const BATCH_SIZE = 40;     // 攒够多少条发一次请求（批量越大，system prompt 摊得越薄）
-  const ZH = (navigator.language || "").toLowerCase().startsWith("zh"); // 界面语言跟随浏览器
   const BATCH_WAIT_MS = 400; // 或最多等待多久
   // ========================================
 
@@ -328,7 +357,21 @@
   // 连接码：填了才把浏览记录交给本机的兴趣程序，留空 = 这个功能完全不存在
   const imBtn = document.createElement("button");
   imBtn.textContent = "🔗";
-  imBtn.title = ZH ? "连接码（本机兴趣程序）" : "Connection code (local interest service)";
+  const IM_STATE_TEXT = {
+    off:     [ "连接码（本机兴趣程序）：未启用", "Connection code (local interest service): off" ],
+    pending: [ "连接码（本机兴趣程序）：等待连接…", "Connection code: connecting…" ],
+    ok:      [ "连接码（本机兴趣程序）：已连接", "Connection code: connected" ],
+    bad:     [ "连接码（本机兴趣程序）：连接码不对，点此重填", "Connection code: rejected — click to re-enter" ],
+    offline: [ "连接码（本机兴趣程序）：本机程序没在运行，记录已暂存", "Connection code: local service not running, events are queued" ],
+  };
+  function imRenderBtn(s) {
+    const txt = IM_STATE_TEXT[s] || IM_STATE_TEXT.off;
+    imBtn.title = ZH ? txt[0] : txt[1];
+    imBtn.style.opacity = s === "ok" ? "1" : s === "off" ? "0.45" : "0.7";
+    imBtn.style.filter = s === "bad" ? "grayscale(1)" : "";
+  }
+  imOnState.push(imRenderBtn);
+  imRenderBtn(imState);
   imBtn.onclick = () => {
     const cur = localStorage.getItem("bfm_im_token") || "";
     const inp = prompt(ZH
@@ -344,7 +387,8 @@
     if (inp === null) return;
     localStorage.setItem("bfm_im_token", inp.trim());
     alert(inp.trim()
-      ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.")
+      ? (ZH ? "已保存，刷新页面生效。连接是否成功，看开关条上 🔗 的提示。"
+            : "Saved. Reload to apply; hover 🔗 on the switch bar to see whether it connected.")
       : (ZH ? "已关闭，脚本不再把任何浏览记录发出去。刷新页面生效。"
             : "Turned off. The script no longer reports anything. Reload to apply."));
   };
@@ -835,7 +879,7 @@
   }, 3000);
   booted = true;
   if (mode !== "all") { ensurePool(); maybeInject(); }
-  window.__bfm = { get pool() { return pool; }, shownBvids, cache, upRule, ensurePool, injectFromPool, stats, fmProb, ROUTE,
+  window.__bfm = { get imState() { return imState; }, get imQueued() { return imQueue.length; }, get imSent() { return imSent; }, get pool() { return pool; }, shownBvids, cache, upRule, ensurePool, injectFromPool, stats, fmProb, ROUTE,
     get delta() { return fmDelta; },
     get backoff() { return { biliBackoffUntil, biliBackoffLevel, llmCooldownUntil, llmFailStreak, poolCooldownUntil }; } }; // 调试用
   scan();
