@@ -1,49 +1,58 @@
-# 个人兴趣模型（Personal Interest Model）
+# Personal Interest Model
 
-> 状态：孵化中。与信息流分类插件同仓库共享底座（分类器、语料、研究管线），成熟后再考虑拆分独立仓库。
+> Status: incubating. Shares its foundations (classifiers, feature pipeline, research assets) with the feed-classification userscripts in this repository; it may be split into its own repo once its boundaries settle.
 
-## 一句话
+## In one line
 
-让"你的浏览兴趣"成为一个**属于你自己的对象**：存在你的机器上，你能看懂它、修改它、导出它——而不是散落在各平台推荐系统里的一堆你看不见的隐式参数。
+Make "your browsing interests" an object **you own**: it lives on your machine, you can read it, edit it and export it — instead of being scattered across platform recommenders as parameters you never see.
 
-## 为什么做（与现有工作的差异）
+## Why this exists
 
-调研结论（2026-08，详见仓库 research/LOG.md E17 前置调研）：
+Survey as of 2026-08 (details in `../research/LOG.md`, E17):
 
-| 已有工作 | 它做什么 | 差异 |
+| Prior work | What it does | How this differs |
 |---|---|---|
-| Google Topics API | Chrome 本地按周把浏览史归入 ~469 个主题，供**广告商**取用 | 方向相反：它算出兴趣是为了给别人用；我们算出兴趣只给用户自己看和用。它粗粒度、用户几乎不可见不可控，被 Brave/Mozilla/Apple 以隐私理由拒绝采纳 |
-| 广告透明工具（MyAdChoices 等） | 展示/清除**平台**给你打的标签 | 只读、对象是别人的模型；我们是构建用户**自己拥有**的模型 |
-| 自建推荐引擎（gorse 等） | 给网站方搭推荐服务 | 服务端视角，与"个人拥有"无关 |
-| 学术：兴趣漂移/时间衰减/长短期画像 | 建模方法论 | **直接复用**：长短期双画像、指数时间衰减、曝光与互动分离计数 |
+| Google Topics API | Chrome classifies browsing history locally into ~469 topics, for **advertisers** to read | Opposite direction: it computes your interests so others can use them; this computes them for you alone. It is coarse, effectively invisible and not editable, and was rejected by Brave/Mozilla/Apple on privacy grounds. |
+| Ad-transparency extensions (MyAdChoices etc.) | Show or clear the labels **a platform** attached to you | Read-only, and about someone else's model; this builds a model you own. |
+| Self-hosted recommenders (gorse etc.) | Recommendation service for site operators | Server-side perspective, unrelated to personal ownership. |
+| Research on interest drift / time decay / long–short profiles | Modelling methodology | **Reused directly**: long/short dual profiles, exponential time decay, exposure and engagement counted separately. |
 
-核心理念差异：现有一切系统建模的都是**揭示偏好**（你点了什么）；本项目同时承载**申明偏好**（你想成为对什么感兴趣的人），并让后者可以压过前者——信息流分类插件的"专业模式"就是这一理念的第一个实例。
+Core conceptual difference: existing systems model **revealed preference** (what you clicked). This one also carries **declared preference** (what you want to be interested in), and lets the latter override the former. The Learn mode in the companion userscripts is the first instance of that idea.
 
-## 设计原则
+## Design principles
 
-1. **本地所有**：全部数据与模型只存在用户设备，无任何上报。
-2. **可理解**：画像用人话呈现（主题分布、趋势、驱动来源），每个判断可解释到具体特征。刻意使用浅层可解释模型——这不是妥协，是产品立身之本。
-3. **可控**：每个主题可以直接调（多看/少看/屏蔽），申明偏好是一等公民。
-4. **可携带**：一键导出/导入，用户可以带着自己的兴趣模型走。
-5. **敏感类目除外**：主题体系只描述内容题材，不含政治立场、宗教、民族、性取向等用户属性类目（参照 Topics API 的类目筛选惯例）。
+1. **Local ownership.** All data and models live on the user's device. Nothing is reported anywhere.
+2. **Understandable.** The profile is shown in plain language (topic distribution, trends, what drove it), and every judgement can be traced to concrete features. Shallow, interpretable models are used on purpose — that is the product, not a compromise.
+3. **Controllable.** Every topic can be adjusted directly (more / less / block). Declared preference is a first-class citizen.
+4. **Portable.** One-click export/import, so users can take their interest model with them.
+5. **No sensitive categories.** The taxonomy describes content subject matter only — no political stance, religion, ethnicity, sexual orientation or other personal attributes (following the Topics API category-screening convention).
 
-## 双轨架构
+## Two tracks
 
-两条路线共用一套事件协议（曝光/点击/停留 + 内容元数据）：
+Both tracks share one event protocol (exposure / click / dwell + content metadata):
 
-- **轻量轨（浏览器内）**：`lite/`。零安装，主题分类器 + 双衰减计数器全部跑在页面里，存 localStorage/IndexedDB。能力有限但人人可得。
-- **完整轨（本地主机）**：`daemon/`。本地常驻服务（默认 127.0.0.1，令牌鉴权 + 来源白名单），插件把事件送回主机：语义嵌入、更强分类器、聚类发现"主题表之外的兴趣"、本地网页仪表盘。插件探测到 daemon 在线自动升级，探测不到回落轻量轨。
+- **Lite (in-browser)** — `lite/`. Zero install: topic classifier plus dual-decay counters run inside the page, stored in localStorage/IndexedDB. Limited, but available to everyone.
+- **Full (local host)** — `daemon/`. A resident local service (binds 127.0.0.1, token auth, origin allowlist). The userscript posts events to your own machine, which runs semantic embeddings, stronger classifiers, and a local web dashboard. The userscript upgrades automatically when it detects the daemon, and falls back to the lite track when it does not.
 
-## 主题体系
+## Taxonomy
 
-`taxonomy.json`：两级，13 大类 / 48 叶子主题，面向中文视频内容。质量评估见 research/LOG.md E13。
+`taxonomy.json`: two levels, 13 groups / 48 leaf topics, aimed at video content, with English names alongside Chinese. Quality evaluation in `../research/LOG.md` (E13).
+`emotions.json`: 9 emotions with valence from +2 to −2 (E18).
 
-## 评估方法
+## Evaluation method
 
-兴趣没有现成地面真值，采用**合成用户回放**：从已标注语料构造已知兴趣配比的虚拟用户（如"编程 40% + 历史 30% + 萌宠 30%"），按配比生成带互动偏好的浏览事件流，回放给两条轨道，度量画像恢复精度（与真实配比的分布距离、Top-K 主题命中）、收敛速度（多少事件后画像稳定）、漂移响应（兴趣中途改变后的适应滞后）。实验记录：research/LOG.md E13~E17。
+Interests have no off-the-shelf ground truth, so evaluation uses **synthetic-user replay**: build virtual users with a known interest mix from labelled corpora (e.g. "40% programming + 30% history + 30% pets"), generate an event stream with realistic engagement bias, replay it through both tracks, and measure profile recovery (distance to the true mix, top-K topic hit rate), convergence speed (how many events until the profile stabilises) and drift response (lag after the interests change mid-stream). Records: `../research/LOG.md` E13–E17.
 
-## 实测结论（2026-08-26）
+## Measured results (2026-08-26)
 
-- **完整轨可用**：大类粒度画像保真 cos=0.80、top3 命中 92%，约 50 个事件即接近收敛；兴趣切换后短期画像在 ~200 事件内部分跟上。集成测试全绿（鉴权/事件流/画像/仪表盘/申明偏好）。
-- **轻量轨的"兴趣镜子"暂不合格**（诚实负结果）：纯浏览器 n-gram 分类器的误差系统性偏向大类，聚合成画像后失真（大类粒度 cos 仅 0.49）。轻量轨当前角色收缩为：事件采集、申明偏好、状态导出，镜子展示交给完整轨。改进路径：用嵌入模型打银标蒸馏（见 research/TOPICS.md）。
-- **方法学发现**：画像保真度取决于分类误差的结构而非误差率——单条准确率是画像质量的误导性指标（E14/E15）。
+- **Full track is usable**: at group granularity the profile reaches cos = 0.80 and 92% top-3 hit rate, approaching convergence after roughly 50 events; after an interest switch the short-term profile partially catches up within about 200 events. Integration tests pass end to end (auth / event ingest / profile / dashboard / declared preference).
+- **The lite track's "mirror" is not good enough yet** (an honest negative result): the pure in-browser n-gram classifier's errors skew systematically toward large categories, so the aggregated profile distorts (cos only 0.49 at group granularity). The lite track's role is therefore narrowed to event collection, declared preference and state export; the mirror itself is served by the full track. Improvement path: distil from the embedding model's silver labels (see `../research/TOPICS.md`).
+- **Methodological finding**: profile fidelity depends on the *structure* of classification errors, not the error rate — single-item accuracy is a misleading proxy for profile quality (E14/E15).
+
+## Running the daemon
+
+```bash
+python3 daemon/app.py            # defaults to 127.0.0.1:21456
+```
+
+It prints a connection code on startup; paste it into the 🔗 button on the userscript's switch bar. Data lives in `~/.interest-model/`. Open `http://127.0.0.1:21456/` for the dashboard.

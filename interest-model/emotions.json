@@ -1,15 +1,60 @@
 {
-  "version": 1,
-  "note": "内容情绪谱：视频标题传递的主导情绪。valence 为效价（-2..+2），用于曲线与词云着色。",
-  "emotions": [
-    {"id": 1, "name": "治愈温暖", "valence": 2.0},
-    {"id": 2, "name": "欢乐搞笑", "valence": 1.5},
-    {"id": 3, "name": "平静求知", "valence": 1.0},
-    {"id": 4, "name": "热血激励", "valence": 1.0},
-    {"id": 5, "name": "中性平淡", "valence": 0.0},
-    {"id": 6, "name": "猎奇刺激", "valence": -0.5},
-    {"id": 7, "name": "悲伤致郁", "valence": -1.0},
-    {"id": 8, "name": "焦虑恐慌", "valence": -2.0},
-    {"id": 9, "name": "愤怒对立", "valence": -2.0}
-  ]
+ "version": 2,
+ "note": "内容情绪谱：视频标题传递的主导情绪。valence 为效价（-2..+2），用于曲线与词云着色。",
+ "emotions": [
+  {
+   "id": 1,
+   "name": "治愈温暖",
+   "valence": 2.0,
+   "name_en": "Heartwarming"
+  },
+  {
+   "id": 2,
+   "name": "欢乐搞笑",
+   "valence": 1.5,
+   "name_en": "Funny"
+  },
+  {
+   "id": 3,
+   "name": "平静求知",
+   "valence": 1.0,
+   "name_en": "Calm & Curious"
+  },
+  {
+   "id": 4,
+   "name": "热血激励",
+   "valence": 1.0,
+   "name_en": "Inspiring"
+  },
+  {
+   "id": 5,
+   "name": "中性平淡",
+   "valence": 0.0,
+   "name_en": "Neutral"
+  },
+  {
+   "id": 6,
+   "name": "猎奇刺激",
+   "valence": -0.5,
+   "name_en": "Shock & Thrill"
+  },
+  {
+   "id": 7,
+   "name": "悲伤致郁",
+   "valence": -1.0,
+   "name_en": "Sad"
+  },
+  {
+   "id": 8,
+   "name": "焦虑恐慌",
+   "valence": -2.0,
+   "name_en": "Anxious"
+  },
+  {
+   "id": 9,
+   "name": "愤怒对立",
+   "valence": -2.0,
+   "name_en": "Angry"
+  }
+ ]
 }

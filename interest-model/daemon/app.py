@@ -224,7 +224,8 @@ def emotion_series(days, cat="all"):
             {"day": day, "valence": round(d["vsum"] / d["n"], 3), "n": d["n"],
              "mix": [round(x / d["n"], 3) for x in d["mix"]]}
             for day, d in sorted(days_map.items())]
-    return {"emotions": E_NAMES, "valences": E_VAL.tolist(), **out}
+    return {"emotions": E_NAMES, "emotions_en": [e.get("name_en", e["name"]) for e in EMO["emotions"]],
+            "valences": E_VAL.tolist(), **out}
 
 
 _STOP = set("的 了 我 你 他 她 它 是 在 有 和 与 就 都 也 又 还 这 那 什么 怎么 为什么 一个 我们 你们 他们 自己 没有 不是 可以 这个 那个 到底 竟然 居然 直接 真的 到底 如何 这样 那样 但是 因为 所以 如果 已经 现在 开始 最后 第一 第二 up 主 UP".split())
@@ -267,7 +268,10 @@ def pro_content(days):
             continue
         seen.add((vid, title))
         item = {"ts": ts, "id": vid, "title": title, "up": up, "topic": LEAVES[topic],
-                "group": group_of.get(topic, ""), "pic": pic or "",
+                "topic_en": TAX.get("leaves_en", {}).get(LEAVES[topic], LEAVES[topic]),
+                "group": group_of.get(topic, ""),
+                "group_en": TAX.get("groups_en", {}).get(group_of.get(topic, ""), group_of.get(topic, "")),
+                "pic": pic or "",
                 "dwell": round(dwell), "dur": round(dur),
                 "site": site}
         if dur > 0:
@@ -293,7 +297,9 @@ def new_interests():
                 "SELECT title, up, vid, site FROM events WHERE topic=? AND etype!='expose' "
                 "AND ts>=? ORDER BY ts DESC LIMIT 3",
                 (i, time.time() - 14 * 86400)).fetchall()
-            out.append({"topic": LEAVES[i], "share": round(s, 3), "before": round(l, 3),
+            out.append({"topic": LEAVES[i],
+                        "topic_en": TAX.get("leaves_en", {}).get(LEAVES[i], LEAVES[i]),
+                        "share": round(s, 3), "before": round(l, 3),
                         "items": [{"title": r[0], "up": r[1], "id": r[2], "site": r[3]} for r in rows]})
     out.sort(key=lambda x: -x["share"])
     return {"interests": out[:6]}
@@ -345,7 +351,8 @@ class H(BaseHTTPRequestHandler):
                 if rows:
                     drivers[LEAVES[t]] = [{"title": r[0], "up": r[1]} for r in rows]
             n_events = ST.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-            self._json({"topics": LEAVES, "groups": TAX["groups"], **d,
+            self._json({"topics": LEAVES, "topics_en": [TAX.get("leaves_en", {}).get(l, l) for l in LEAVES],
+                        "groups": TAX["groups"], "groups_en": TAX.get("groups_en", {}), **d,
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
                         "classifier": CLF.mode, "emotion_on": CLF.emo_clf is not None})
         elif u.path == "/emotion_series":

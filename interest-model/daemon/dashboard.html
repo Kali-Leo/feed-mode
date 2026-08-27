@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>兴趣</title>
+<title>Interests</title>
 <style>
   :root {
     color-scheme: light;
@@ -67,11 +67,11 @@
 
 <section class="panel">
 
-<h2>内容情绪
+<h2><span data-i="emoTitle">内容情绪</span>
   <span class="seg" id="ecat">
-    <button data-c="all" class="on">全部</button><button data-c="pro">专业</button><button data-c="ent">娱乐</button><button data-c="gent">精选娱乐</button>
+    <button data-c="all" class="on" data-i="catAll">全部</button><button data-c="pro" data-i="catPro">专业</button><button data-c="ent" data-i="catEnt">娱乐</button><button data-c="gent" data-i="catGent">精选娱乐</button>
   </span>
-  <span class="legend"><span><i style="background:#eb6834"></i>投喂</span><span><i style="background:#2a78d6"></i>选择</span></span>
+  <span class="legend"><span><i style="background:#eb6834"></i><span data-i="legFeed">投喂</span></span><span><i style="background:#2a78d6"></i><span data-i="legPick">选择</span></span></span>
 </h2>
 <div id="chartwrap">
   <svg id="chart" width="100%" height="190" viewBox="0 0 860 190"></svg>
@@ -80,26 +80,43 @@
 </section>
 
 <section class="panel">
-<h2>词云
+<h2><span data-i="cloudTitle">词云</span>
   <span class="seg" id="cwin">
-    <button data-d="7">7天</button><button data-d="30" class="on">30天</button><button data-d="90">90天</button><button data-d="365">一年</button>
+    <button data-d="7" data-i="w7">7天</button><button data-d="30" class="on" data-i="w30">30天</button><button data-d="90" data-i="w90">90天</button><button data-d="365" data-i="w365">一年</button>
   </span>
 </h2>
 <canvas id="cloudc" width="860" height="380"></canvas>
 </section>
 
 <section class="panel">
-<h2>新的兴趣</h2>
+<h2><span data-i="newTitle">新的兴趣</span></h2>
 <ul class="items" id="newint"></ul>
 </section>
 
 <section class="panel">
-<h2>专业内容 <span class="seg" id="ptab"><button data-t="unfin" class="on">没看完</button><button data-t="fin">看完</button></span>
+<h2><span data-i="proTitle">专业内容</span> <span class="seg" id="ptab"><button data-t="unfin" class="on" data-i="unfin">没看完</button><button data-t="fin" data-i="fin">看完</button></span>
   <span class="seg" id="pcat"></span></h2>
 <div class="cards" id="procards"></div>
 </section>
 
 <script>
+const ZH = (navigator.language || "").toLowerCase().startsWith("zh");
+const I18N = {
+  emoTitle: "Content emotion", catAll: "All", catPro: "Learn", catEnt: "Fun", catGent: "Feel-good",
+  legFeed: "Fed to me", legPick: "My choice",
+  cloudTitle: "Word cloud", w7: "7d", w30: "30d", w90: "90d", w365: "1y",
+  newTitle: "New interests", proTitle: "Informative content", unfin: "Unfinished", fin: "Finished",
+};
+const T = {
+  noData: ZH ? "没有数据" : "No data",
+  none: ZH ? "没有" : "None",
+  empty: ZH ? "暂无" : "None yet",
+  valence: ZH ? "效价" : "valence",
+  items: ZH ? "条" : "items",
+  catAllChip: ZH ? "全部" : "All",
+  min: ZH ? "分钟" : "min",
+};
+if (!ZH) document.querySelectorAll("[data-i]").forEach(e => { const v = I18N[e.dataset.i]; if (v) e.textContent = v; });
 const C_FEED = "#eb6834", C_PICK = "#2a78d6";
 const linkOf = (site, id) => !id ? null :
   id.startsWith("BV") ? `https://www.bilibili.com/video/${id}` :
@@ -118,7 +135,7 @@ async function loadEmotion(cat) {
   curveData = d;
   const svg = document.getElementById("chart");
   const all = [...d.expose, ...d.engage];
-  if (!all.length) { svg.innerHTML = '<text x="20" y="40">没有数据</text>'; return; }
+  if (!all.length) { svg.innerHTML = '<text x="20" y="40">' + T.noData + '</text>'; return; }
   const days = [...new Set(all.map(p => p.day))].sort((a, b) => a - b);
   const X = t => 26 + (days.indexOf(t) / Math.max(1, days.length - 1)) * 780;
   const Y = v => 95 - v * 40;
@@ -137,7 +154,7 @@ async function loadEmotion(cat) {
     return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>` +
            `<text x="${Math.min(end[0] + 6, 820)}" y="${end[1] + 3}" style="fill:${color};font-weight:600">${label}</text>`;
   };
-  s += mkPath(d.expose, C_FEED, "投喂") + mkPath(d.engage, C_PICK, "选择");
+  s += mkPath(d.expose, C_FEED, ZH ? "投喂" : "Fed") + mkPath(d.engage, C_PICK, ZH ? "选择" : "Chosen");
   svg.innerHTML = s;
 }
 document.getElementById("chart").addEventListener("mousemove", e => {
@@ -149,14 +166,14 @@ document.getElementById("chart").addEventListener("mousemove", e => {
   const all = [...new Set([...curveData.expose, ...curveData.engage].map(p => p.day))].sort((a, b) => a - b);
   const X = t => 26 + (all.indexOf(t) / Math.max(1, all.length - 1)) * 780;
   const Y = v => 95 - v * 40;
-  for (const [series, name] of [[curveData.expose, "投喂"], [curveData.engage, "选择"]])
+  for (const [series, name] of [[curveData.expose, ZH ? "投喂" : "Fed"], [curveData.engage, ZH ? "选择" : "Chosen"]])
     for (const p of series) {
       const dx = X(p.day) - mx, dy = Y(p.valence) - my, dd = dx * dx + dy * dy;
       if (!best || dd < best.dd) best = { dd, p, name };
     }
   if (best && best.dd < 900) {
     const D = new Date(best.p.day * 1000);
-    tip.textContent = `${D.getMonth() + 1}.${D.getDate()} ${best.name} 效价${best.p.valence} ${best.p.n}条`;
+    tip.textContent = `${D.getMonth() + 1}.${D.getDate()} ${best.name} ${T.valence} ${best.p.valence} · ${best.p.n} ${T.items}`;
     tip.style.left = e.clientX - r.left + 12 + "px";
     tip.style.top = e.clientY - r.top - 8 + "px";
     tip.style.display = "block";
@@ -182,7 +199,7 @@ async function loadCloud(days) {
   const ctx = cv.getContext("2d");
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
-  if (!d.words.length) { ctx.fillStyle = "#8a897f"; ctx.font = "13px system-ui"; ctx.fillText("没有数据", 20, 40); return; }
+  if (!d.words.length) { ctx.fillStyle = "#8a897f"; ctx.font = "13px system-ui"; ctx.fillText(T.noData, 20, 40); return; }
   const ns = d.words.map(w => w.n);
   const nMax = ns[0], nMin = ns[ns.length - 1];
   const tOf = n => nMax > nMin ? (n - nMin) / (nMax - nMin) : 0.5;
@@ -225,16 +242,17 @@ async function loadCloud(days) {
 async function loadNew() {
   const d = await (await fetch("/new_interests")).json();
   const el = document.getElementById("newint");
-  if (!d.interests.length) { el.innerHTML = '<li class="empty">暂无</li>'; return; }
+  if (!d.interests.length) { el.innerHTML = '<li class="empty">' + T.empty + '</li>'; return; }
   el.innerHTML = d.interests.map(x =>
-    `<li><span class="ni-topic">${esc(x.topic)}</span><span class="ni-share">${(x.share * 100).toFixed(0)}%↑</span>` +
+    `<li><span class="ni-topic">${esc(ZH ? x.topic : (x.topic_en || x.topic))}</span><span class="ni-share">${(x.share * 100).toFixed(0)}%↑</span>` +
     (x.items.length ? `<div class="meta">${x.items.map(titleHtml).join(" · ")}</div>` : "") + `</li>`).join("");
 }
 
 // ---------- 专业内容 ----------
-let proData = null, proTab = "unfin", proCat = "全部";
+let proData = null, proTab = "unfin", proCat = "全部", groupEn = {};
 async function loadPro() {
   proData = await (await fetch("/pro_content?days=90")).json();
+  for (const it of [...proData.unfinished, ...proData.finished]) if (it.group) groupEn[it.group] = it.group_en || it.group;
   renderProCats();
   renderPro();
 }
@@ -245,13 +263,13 @@ function renderProCats() {
   const cats = ["全部", ...Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])];
   const el = document.getElementById("pcat");
   el.innerHTML = cats.map(c =>
-    `<button data-g="${c}" class="${c === proCat ? "on" : ""}">${c}${c === "全部" ? "" : " " + cnt[c]}</button>`).join("");
+    `<button data-g="${c}" class="${c === proCat ? "on" : ""}">${c === "全部" ? T.catAllChip : esc(ZH ? c : (groupEn[c] || c))}${c === "全部" ? "" : " " + cnt[c]}</button>`).join("");
 }
 function renderPro() {
   const list = (proTab === "unfin" ? proData.unfinished : proData.finished)
     .filter(it => proCat === "全部" || it.group === proCat);
   const el = document.getElementById("procards");
-  if (!list.length) { el.innerHTML = '<div class="empty">没有</div>'; return; }
+  if (!list.length) { el.innerHTML = '<div class="empty">' + T.none + '</div>'; return; }
   el.innerHTML = list.map(it => {
     const url = linkOf(it.site, it.id);
     const pct = it.dur > 0 ? Math.min(100, Math.round(it.dwell / it.dur * 100)) : (proTab === "fin" ? 100 : 0);
@@ -259,8 +277,8 @@ function renderPro() {
     return `<div class="card">` +
       (it.pic ? `<img class="thumb" src="${esc(it.pic)}@256w_160h_1c" referrerpolicy="no-referrer" loading="lazy">` : `<div class="thumb"></div>`) +
       `<div class="body"><a class="t" ${url ? `href="${url}" target="_blank"` : ""}>${esc(it.title)}</a>` +
-      `<div class="m">${esc(it.up)} · ${esc(it.topic)} · ${D.getMonth() + 1}.${D.getDate()}` +
-      (it.dur ? ` · ${Math.round(it.dwell / 60)}/${Math.round(it.dur / 60)}分钟` : "") + `</div>` +
+      `<div class="m">${esc(it.up)} · ${esc(ZH ? it.topic : (it.topic_en || it.topic))} · ${D.getMonth() + 1}.${D.getDate()}` +
+      (it.dur ? ` · ${Math.round(it.dwell / 60)}/${Math.round(it.dur / 60)} ${T.min}` : "") + `</div>` +
       `<div class="grow"></div><div class="prog"><i class="${pct >= 80 ? "done" : ""}" style="width:${pct}%"></i></div></div></div>`;
   }).join("");
 }

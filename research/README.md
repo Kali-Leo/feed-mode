@@ -1,31 +1,37 @@
-# research/ — 项目研究资产
+# research/
 
-本目录沉淀「信息流分类」项目的实验记录与研究结论，目标是让每个工程决策都有可追溯的数据支撑。
+Experiment records and research assets for the feed-classification project. The goal is that every engineering decision here is traceable to data.
 
-## 文件
+## Files
 
-- `LOG.md` — 实验台账。每个实验一节：动机 / 设置 / 数据 / 结果 / 结论 / 成本。只追加，不删改；结论被推翻时新增实验引用旧编号。
-- `TOPICS.md` — 研究课题清单（对项目有用、值得做但尚未做的问题）。
-- `results/` — 机器可读的实验产物（JSON/JSONL），与 LOG.md 中的表格一一对应。
+| Path | What it is |
+|---|---|
+| `LOG.md` | Experiment log. One section per experiment: motivation / setup / data / result / conclusion / cost. Append-only — when a conclusion is overturned, add a new experiment referencing the old ID instead of editing it. |
+| `TOPICS.md` | Open research questions worth doing but not done yet. |
+| `pipeline/` | Collection, labelling, training, export and parity-check scripts. |
+| `data/` | Corpora and label sets (gzipped JSONL) plus the frozen split. |
+| `results/` | Machine-readable artefacts (JSON/JSONL) matching the tables in `LOG.md`. |
 
-## 方法论约定
+## Method rules
 
-1. **冻结测试集**：模型对比一律在同一份 held-out 测试集上进行；测试集按 UP 主分组切分（同一 UP 的样本不得横跨训练/测试，防止措辞风格泄漏虚高指标）。
-2. **重复与方差**：涉及随机性的实验（数据抽样、初始化）至少 3 个随机种子，报告均值±标准差。
-3. **单变量原则**：数据量缩放实验固定模型配置只动数据量；超参搜索实验固定数据只动配置。
-4. **成本记账**：每个实验记录 LLM token 花费（来自 API 返回的 usage，非估算）与 B站请求数。
-5. **诚实记录**：负结果、失误（如变量未控制）照记，并标注对结论有效性的影响。
+1. **Frozen test set.** Model comparisons always run on the same held-out set, split by uploader/channel so the same creator never appears on both sides — otherwise phrasing style leaks and inflates the numbers.
+2. **Repeats and variance.** Anything with randomness (sampling, initialisation) runs at least 3 seeds; report mean ± sd.
+3. **One variable at a time.** Data-scaling experiments freeze the model config and vary only the amount of data; hyper-parameter searches freeze the data.
+4. **Cost accounting.** Every experiment records LLM token spend (taken from the API's own `usage` field, never estimated) and the number of platform requests.
+5. **Honest records.** Negative results and mistakes — such as an uncontrolled variable — are written down, with a note on how much they weaken the conclusion.
 
-## 标注策略（由 E7 确定）
+## Labelling policy (set by E7)
 
-- **训练标签一律用 v4-flash**（关思考，~¥0.06/千条）：E7 实证净化标签训练无增益，flash 噪声对线性模型无害，贵模型打训练标签是浪费。
-- **评测集标签用 v4-pro，一次性投入**：评测集定义标准，不能用学生的老师当裁判（会把"学得像老师的噪声"误判为能力）。已建成的 v4-pro 评测集是固定资产，冻结复用，不产生经常性费用。
-- **不再做仲裁**（E7 证明 ROI 低）。
-- 待办：~200 条人工金标，三方对齐验证"v4-pro 确实比 flash 更接近真值"这一目前未证实的假设。
+- **Training labels always use v4-flash** (thinking disabled, ~¥0.06 per 1k items). E7 showed that cleaning training labels brings no measurable gain: the linear model absorbs random label noise, so paying a stronger model to produce training labels is waste.
+- **Evaluation labels use v4-pro, once.** The evaluation set defines the standard, so it must not be graded by the same model that taught the student — otherwise "learned the teacher's quirks" scores as ability. The v4-pro evaluation set already exists and is frozen; it is a fixed asset, not a recurring cost.
+- **No more arbitration** — E7 showed the return on it is poor.
+- Open item: ~200 human-labelled items to verify the currently unproven assumption that v4-pro is in fact closer to ground truth than flash.
 
-## 标签体系
+## Label axes
 
-两个独立二元轴（由 deepseek-chat 按固定提示词标注，提示词版本见 LOG）：
+Three independent axes, all produced by v4-flash with fixed prompts (prompt versions recorded in `LOG.md`):
 
-- `pro`：专业内容——有信息密度、能学到真东西，且语气冷静克制；情绪化标题党式"分析"不算。
-- `neg`：负能量——贩卖焦虑/恐慌、引战对立、猎奇审丑擦边、狗血、愤怒向社会新闻、卖课营销。
+- `pro` — informative content: dense, you actually learn something, and the tone stays calm. Emotionally charged "analysis" clickbait does not qualify.
+- `neg` — negative content: anxiety-mongering, panic, rage-baiting, shock/lurid content, drama, anger-driven news, course-selling marketing.
+- `topic` — one of 48 leaf topics in `../interest-model/taxonomy.json`.
+- `emotion` — one of 9 emotions in `../interest-model/emotions.json`, each with a valence from +2 to −2.
