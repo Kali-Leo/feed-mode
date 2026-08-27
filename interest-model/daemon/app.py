@@ -37,6 +37,28 @@ try:
 except Exception:
     WORD_VAL = {}
 
+# ---- 一次性配对码：让本机程序把令牌交给浏览器脚本，用户不必手抄 ----
+# 申请配对码需要令牌（只有能读本机令牌文件的程序做得到）；兑换需要浏览器自带的 Origin。
+# 令牌本身仍是唯一凭证，安全模型不降级。
+PAIR_TTL = 120.0
+_pairs = {}          # nonce -> 过期时间
+_pairs_lock = threading.Lock()
+
+def pair_new():
+    now = time.time()
+    with _pairs_lock:
+        for k in [k for k, exp in _pairs.items() if exp < now]:
+            del _pairs[k]
+        nonce = secrets.token_urlsafe(18)
+        _pairs[nonce] = now + PAIR_TTL
+    return nonce
+
+def pair_exchange(nonce):
+    """一次性：兑换成功即作废。返回令牌或 None。"""
+    with _pairs_lock:
+        exp = _pairs.pop(nonce, None)
+    return TOKEN if exp and exp >= time.time() else None
+
 
 class Classifier:
     """编码一次，主题/情绪两个头共享嵌入；缺依赖时回落 n-gram（无情绪头）。"""
@@ -351,7 +373,7 @@ class H(BaseHTTPRequestHandler):
                 if rows:
                     drivers[LEAVES[t]] = [{"title": r[0], "up": r[1]} for r in rows]
             n_events = ST.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-            self._json({"topics": LEAVES, "topics_en": [TAX.get("leaves_en", {}).get(l, l) for l in LEAVES],
+            self._json({"api_version": 1, "topics": LEAVES, "topics_en": [TAX.get("leaves_en", {}).get(l, l) for l in LEAVES],
                         "groups": TAX["groups"], "groups_en": TAX.get("groups_en", {}), **d,
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
                         "classifier": CLF.mode, "emotion_on": CLF.emo_clf is not None})
@@ -370,6 +392,22 @@ class H(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, 404)
 
     def do_POST(self):
+        # 配对兑换不需要令牌（本来就是为了取令牌），但必须来自白名单 Origin 且持有有效配对码
+        if self.path == "/pair/exchange":
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            if self.headers.get("Origin", "") not in ALLOWED_ORIGINS:
+                self._json({"error": "origin not allowed"}, 403, cors=True)
+                return
+            try:
+                nonce = json.loads(body).get("nonce", "")
+            except Exception:
+                nonce = ""
+            tok = pair_exchange(str(nonce))
+            if tok:
+                self._json({"token": tok}, cors=True)
+            else:
+                self._json({"error": "invalid or expired pairing code"}, 403, cors=True)
+            return
         if self.headers.get("X-IM-Token", "") != TOKEN:
             self._json({"error": "bad token"}, 403, cors=True)
             return
@@ -387,6 +425,9 @@ class H(BaseHTTPRequestHandler):
                 ST.update(tps[i], eps[i] if eps is not None else None, e)
             ST.flush()
             self._json({"ok": True, "n": len(evs)}, cors=True)
+        elif self.path == "/pair/new":
+            # 本机程序调用：换一个一次性配对码，附到浏览器 URL 的 fragment 里
+            self._json({"nonce": pair_new(), "expires_in": int(PAIR_TTL)}, cors=True)
         elif self.path == "/prefs":
             for k, v in data.items():
                 if k in LEAVES:
