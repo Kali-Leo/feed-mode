@@ -19,7 +19,7 @@ English | [中文](README.zh-CN.md)
 
 - **Four modes**: All / Fun / Feel-good (healing, comedy, talent, pets — filters rage-bait, shock content and anxiety-mongering) / Learn (science, tech, finance, documentaries with a calm tone — clickbait "analysis" doesn't count)
 - **Built-in local model**: works offline out of the box, no API key needed
-- **Optional cloud review**: add a DeepSeek API key for higher accuracy; usage and cost shown live, with a tolerance slider to control how much goes to the cloud
+- **Optional cloud review**: add a DeepSeek API key for higher accuracy; usage and cost shown live, with a tolerance slider to control how much goes to the cloud — slide it to the end to turn the cloud off entirely and run fully offline
 - **Hands off business**: no ad blocking, no link rewriting — creator revenue is untouched
 
 ## 📊 Does it actually improve the feed?

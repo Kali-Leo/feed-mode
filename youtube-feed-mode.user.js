@@ -2,7 +2,7 @@
 // @name         YouTube Feed Mode: Learn / Feel-good / Fun
 // @name:zh-CN   YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      2.0.3
+// @version      2.0.4
 // @description  Filter your YouTube home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box — no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with YouTube/Google.
 // @description:zh-CN  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
@@ -273,12 +273,14 @@
   let tol = Math.max(0, Math.min(100, Number(localStorage.getItem("yfm_tol") ?? 50)));
   const ROUTE = { low: 0, high: 2, audit: 0 };
   function applyTol() {
+    ROUTE.off = tol >= 100; // 拉到头 = 完全不用 LLM，只信本地模型，置信度不足的丢弃
     ROUTE.low = tol === 0 ? -1 : Math.min(0.60, 0.10 + 0.008 * tol);
     ROUTE.high = tol <= 50 ? 2 : 0.995 - 0.003 * (tol - 50);
     ROUTE.audit = tol === 0 ? 0 : Math.max(0.01, 0.06 - 0.0005 * tol);
   }
   applyTol();
   const fmShareEst = () => {
+    if (ROUTE.off) return 0;
     const k = String(Math.min(100, Math.max(0, Math.round((ROUTE.low * 100) / 5) * 5)));
     return FM_SHARE[k] ?? 0.35;
   };
@@ -548,8 +550,10 @@
     if (upRule[owner]) return upRule[owner];
     if (cache[id]) return cache[id];
     const lp = fmProb(title, owner);
-    if (!API_KEY) {
-      if (lp >= 0.5) return "pro";
+    if (!API_KEY || ROUTE.off) {
+      // 纯本地模式：置信度足够才判，不足的丢弃不展示（阈值来自外折实测，研究 E24）
+      if (lp >= 0.70) return "pro";
+      if (lp > 0.30) return "unk";
       const kw = kwClassify(title, owner);
       return kw === "pro" ? "ent" : kw;
     }
