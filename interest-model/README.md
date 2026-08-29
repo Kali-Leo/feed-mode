@@ -6,6 +6,16 @@
 
 Make "your browsing interests" an object **you own**: it lives on your machine, you can read it, edit it and export it — instead of being scattered across platform recommenders as parameters you never see.
 
+## Quick start
+
+Requires [Python 3.10+](https://www.python.org/downloads/) and one of the feed-mode userscripts installed.
+
+1. Download this repository ([zip](https://github.com/Kali-Leo/feed-mode/archive/refs/heads/main.zip)) and unpack it
+2. In the `interest-model` folder, run `./start.sh` (Windows: double-click `start.bat`). The first run installs dependencies (~2 GB, once); your browser then opens the dashboard
+3. The dashboard shows two connect links — click your site, done
+
+From then on, just browse as usual and the dashboard fills in: emotion curves of what you're fed vs what you open, word clouds, emerging interests, unfinished informative videos. You can also connect or open the dashboard any time from the 🔗 button on the userscript's switch bar. Data lives in `~/.interest-model/`, and never leaves your machine.
+
 ## Why this exists
 
 Survey as of 2026-08 (details in `../research/LOG.md`, E17):
@@ -49,10 +59,6 @@ Interests have no off-the-shelf ground truth, so evaluation uses **synthetic-use
 - **The lite track's "mirror" is not good enough yet** (an honest negative result): the pure in-browser n-gram classifier's errors skew systematically toward large categories, so the aggregated profile distorts (cos only 0.49 at group granularity). The lite track's role is therefore narrowed to event collection, declared preference and state export; the mirror itself is served by the full track. Improvement path: distil from the embedding model's silver labels (see `../research/TOPICS.md`).
 - **Methodological finding**: profile fidelity depends on the *structure* of classification errors, not the error rate — single-item accuracy is a misleading proxy for profile quality (E14/E15).
 
-## Running the daemon
+## Running the daemon by hand
 
-```bash
-python3 daemon/app.py            # defaults to 127.0.0.1:21456
-```
-
-Then, in the browser where the userscript runs, open `http://127.0.0.1:21456/pair` and pick the site — the page jumps there and the script pairs itself automatically (one-time code, no copying). The dashboard is at `http://127.0.0.1:21456/`. Data lives in `~/.interest-model/`.
+`start.sh` / `start.bat` wrap `python3 daemon/app.py` (defaults to `127.0.0.1:21456`; `--no-browser` skips opening the dashboard). Pairing without the dashboard: open `http://127.0.0.1:21456/pair` and pick the site — a one-time code completes the handshake, nothing to copy.

@@ -33,5 +33,5 @@ Ordered by expected value to the project. When one is finished, move it to `LOG.
 
 ## Pending tasks (not research)
 
-- **Publish the internationalised builds to Greasy Fork**: local is at Bilibili 2.0.6 / YouTube 2.0.4 (i18n, pairing, LLM-off mode with confidence-based dropping, 2.6x refill throughput); the store still has 2.0.2 / 2.0.0. Needs a signed-in browser session.
+- **Publish the internationalised builds to Greasy Fork**: local is at Bilibili 2.0.7 / YouTube 2.0.5 (i18n, click-through pairing, LLM-off mode with confidence-based dropping, 2.6x refill throughput); the store still has 2.0.2 / 2.0.0. Needs a signed-in browser session.
 - **`LOG.md` is still in Chinese.** It is the raw experiment record and the largest document here; translating it is worthwhile for English-speaking contributors but has not been done.

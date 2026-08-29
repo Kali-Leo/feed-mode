@@ -16,6 +16,7 @@ The daemon in `daemon/app.py` binds `127.0.0.1` only. This document is the contr
 | Write endpoints (`POST /events`, `POST /prefs`) | Header `X-IM-Token` must equal the token in `~/.interest-model/token`. |
 | `POST /pair/new` | Same token. Intended for local programs that can read the token file. |
 | `POST /pair/exchange` | No token, but `Origin` must be in the allowlist (`https://www.bilibili.com`, `https://www.youtube.com`) **and** the pairing code must be valid. |
+| `GET /pair` | None (the daemon binds 127.0.0.1 only). A human-facing launcher: it lists site links, and `GET /pair?site=bilibili\|youtube` mints a code and 302-redirects to that site with `#im-pair=<nonce>`, where the script completes the exchange. Local programs should keep using `POST /pair/new`. |
 
 ## Pairing (how a browser script gets the token without the user copying it)
 

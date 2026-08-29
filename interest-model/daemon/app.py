@@ -162,6 +162,8 @@ class State:
             self.expose = np.array(d["expose"]); self.ts = d["ts"]; self.prefs = d.get("prefs", {})
 
     def _decay(self, now):
+        # 衰减只由服务端时钟推进：浏览器时钟快一年曾能一次抹平整个画像且不可恢复。
+        # 事件自带的 ts 只用于记录与"迟到折扣"（见 update），不再推动 self.ts。
         if self.ts is not None:
             dt = max(0.0, now - self.ts)
             self.short *= 0.5 ** (dt / HL_SHORT)
@@ -169,25 +171,59 @@ class State:
             self.expose *= 0.5 ** (dt / HL_LONG)
         self.ts = max(self.ts or 0, now)
 
+    @staticmethod
+    def event_weight(etype, dwell):
+        return 1.0 if etype == "expose" else (5.0 if etype == "click" else 5.0 + min(dwell / 60.0, 10.0))
+
+    def _apply(self, tp, etype, w, age):
+        """把一个发生在 age 秒前的事件按"先衰减后入账"计入向量——
+        退避重投的旧事件从此按其真实年龄折扣，而不是按全权重入账。"""
+        if etype == "expose":
+            self.expose += w * tp * 0.5 ** (age / HL_LONG)
+        else:
+            self.short += w * tp * 0.5 ** (age / HL_SHORT)
+            self.long += w * tp * 0.5 ** (age / HL_LONG)
+
     def update(self, tp, ep, ev):
-        now = float(ev.get("ts", time.time()))
+        now = time.time()
+        ev_ts = float(ev.get("ts", now))
+        # 客户端时钟只在合理窗口内被信任：未来或早于 30 天的时间戳按"现在"处理
+        if not (now - 30 * 86400 <= ev_ts <= now + 60):
+            ev_ts = now
         etype = ev.get("type", "expose")
         dwell = float(ev.get("dwell", 0))
+        vid = str(ev.get("id", ""))[:30]
         with self.lock:
+            # 同一 (vid, etype, ts) 的重复投递（脚本退避重试）只入账一次
+            if self.db.execute("SELECT 1 FROM events WHERE ts=? AND vid=? AND etype=? LIMIT 1",
+                               (ev_ts, vid, etype)).fetchone():
+                return
             self._decay(now)
-            w = 1.0 if etype == "expose" else (5.0 if etype == "click" else 5.0 + min(dwell / 60.0, 10.0))
-            if etype == "expose":
-                self.expose += tp
-            else:
-                self.short += w * tp
-                self.long += w * tp
+            self._apply(tp, etype, self.event_weight(etype, dwell), now - ev_ts)
             emo = int(ep.argmax()) if ep is not None else -1
             val = float(ep @ E_VAL) if ep is not None else None
             self.db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                            (now, ev.get("site", "?"), str(ev.get("id", ""))[:30],
+                            (ev_ts, ev.get("site", "?"), vid,
                              str(ev.get("t", ""))[:120], str(ev.get("u", ""))[:40], etype,
                              dwell, float(ev.get("dur", 0)), int(tp.argmax()), emo, val,
                              str(ev.get("pic", ""))[:200]))
+
+    def rebuild_profile(self):
+        """从 events 表重算三个向量——时钟事故的恢复出口。事件只存了 top-1 主题
+        （完整概率分布未落库），重放时按 one-hot 近似，画像会略比在线累积的"硬"。"""
+        with self.lock:
+            now = time.time()
+            self.short = np.zeros(N); self.long = np.zeros(N); self.expose = np.zeros(N)
+            self.ts = now
+            rows = self.db.execute(
+                "SELECT ts, etype, dwell, topic FROM events WHERE topic IS NOT NULL").fetchall()
+            for ev_ts, etype, dwell, topic in rows:
+                if not 0 <= topic < N:
+                    continue
+                tp = np.zeros(N); tp[topic] = 1.0
+                self._apply(tp, etype, self.event_weight(etype, dwell or 0.0),
+                            max(0.0, now - ev_ts))
+            return len(rows)
 
     def flush(self):
         with self.lock:
@@ -203,6 +239,7 @@ class State:
         return {"short": nz(self.short), "long": nz(self.long), "expose": nz(self.expose)}
 
 
+print("[interest-daemon] 正在加载分类模型；首次运行需下载语义模型（约600MB），请稍候…")
 CLF = Classifier()
 ST = State()
 
@@ -310,6 +347,10 @@ def pro_content(days):
 
 def new_interests():
     """新的兴趣：近期占比显著且相对长期明显上升的主题，附最近点开的内容。"""
+    # 数据太少时不判：总共只点开过二十几条时，一次点击就能把偶然宣布成"新的兴趣"。
+    n_engaged = ST.db.execute("SELECT COUNT(*) FROM events WHERE etype!='expose'").fetchone()[0]
+    if n_engaged < 50:
+        return {"interests": []}
     d = ST.dists()
     out = []
     for i in range(N):
@@ -373,8 +414,12 @@ class H(BaseHTTPRequestHandler):
                 if rows:
                     drivers[LEAVES[t]] = [{"title": r[0], "up": r[1]} for r in rows]
             n_events = ST.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            # 曝光纠偏：主动选择占比 / 被投喂占比。>1 = 兴趣高于投喂量，<1 = 主要是被喂的。
+            # 平台推荐什么就"兴趣"什么的退化闭环，靠这一路信号才能被消费方拆开。
+            lift = [round(s / max(e, 0.005), 2) for s, e in zip(d["short"], d["expose"])]
             self._json({"api_version": 1, "topics": LEAVES, "topics_en": [TAX.get("leaves_en", {}).get(l, l) for l in LEAVES],
                         "groups": TAX["groups"], "groups_en": TAX.get("groups_en", {}), **d,
+                        "lift": lift,
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
                         "classifier": CLF.mode, "emotion_on": CLF.emo_clf is not None})
         elif u.path == "/emotion_series":
@@ -447,6 +492,11 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/pair/new":
             # 本机程序调用：换一个一次性配对码，附到浏览器 URL 的 fragment 里
             self._json({"nonce": pair_new(), "expires_in": int(PAIR_TTL)}, cors=True)
+        elif self.path == "/rebuild_profile":
+            # 时钟事故的恢复出口：从 events 表整体重算画像（见 State.rebuild_profile）
+            n = ST.rebuild_profile()
+            ST.flush()
+            self._json({"ok": True, "replayed": n}, cors=True)
         elif self.path == "/prefs":
             for k, v in data.items():
                 if k in LEAVES:
@@ -460,7 +510,11 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=21456)
+    ap.add_argument("--no-browser", action="store_true", help="启动时不自动打开浏览器")
     args = ap.parse_args()
     print(f"[interest-daemon] 仪表盘: http://127.0.0.1:{args.port}/  分类器={CLF.mode}")
     print(f"[interest-daemon] 连接插件: 浏览器打开 http://127.0.0.1:{args.port}/pair")
+    if not args.no_browser:
+        import webbrowser
+        threading.Timer(1.0, webbrowser.open, [f"http://127.0.0.1:{args.port}/"]).start()
     ThreadingHTTPServer(("127.0.0.1", args.port), H).serve_forever()

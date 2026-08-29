@@ -2,7 +2,7 @@
 // @name         YouTube Feed Mode: Learn / Feel-good / Fun
 // @name:zh-CN   YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      2.0.4
+// @version      2.0.5
 // @description  Filter your YouTube home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box — no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with YouTube/Google.
 // @description:zh-CN  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
@@ -22,7 +22,7 @@
   const ZH = (navigator.language || "").toLowerCase().startsWith("zh"); // 界面语言跟随浏览器
 
   // ================= 个人兴趣模型回传（默认关闭） =================
-  // 只有在开关条的 🔗 里填了连接码，下面这些才会做事；没填时全部空转，脚本行为与不带此功能时一致。
+  // 只有通过开关条的 🔗 完成连接后，下面这些才会做事；未连接时全部空转，脚本行为与不带此功能时一致。
   // 目标固定为本机 127.0.0.1 的兴趣服务（interest-model/daemon），发的是标题、频道名、视频 id、
   // 封面地址、观看时长；不发 Cookie、不发账号、不发任何身份信息，也不发往本机以外的任何地方。
   const IM_URL = "http://127.0.0.1:21456/events";
@@ -52,7 +52,7 @@
   window.addEventListener("hashchange", imPair);
   const imQueue = [];
   let imTimer = null;
-  // 连接状态：off 未启用 / ok 正常 / bad 连接码不对 / offline 本机程序没开
+  // 连接状态：off 未连接 / ok 正常 / bad 令牌失效 / offline 本机程序没开
   let imState = IM_TOKEN ? "pending" : "off";
   let imSent = 0, imFails = 0, imWarned = false;
   const imOnState = [];
@@ -60,11 +60,11 @@
     if (imState === s) return;
     imState = s;
     for (const fn of imOnState) fn(s);
-    // 连接码不对是配置错误，用户不改就永远收不到数据，必须说一次
+    // 令牌失效是配置错误，用户不重连就永远收不到数据，必须说一次
     if (s === "bad" && !imWarned) {
       imWarned = true;
-      alert(ZH ? "兴趣程序的连接码不对，浏览记录没有送达。请点开关条上的 🔗 重新粘贴（程序启动时会打印新的连接码）。"
-               : "The interest service rejected the connection code, so nothing is being recorded. Click 🔗 on the switch bar and paste the current code (the service prints it on startup).");
+      alert(ZH ? "本地兴趣模型拒绝了连接，浏览记录没有送达。请点开关条上的 🔗 重新连接。"
+               : "The local interest model rejected the connection, so nothing is being recorded. Click 🔗 on the switch bar to reconnect.");
     }
   }
   function imFlush() {
@@ -78,7 +78,7 @@
       keepalive: true,
     }).then((r) => {
       if (r.ok) { imSent += batch.length; imFails = 0; imSetState("ok"); return; }
-      // 403 = 连接码不对：留着也没用，丢弃并提示
+      // 403 = 令牌失效：留着也没用，丢弃并提示
       if (r.status === 403) { imSetState("bad"); return; }
       imQueue.unshift(...batch);
       imSetState("offline");
@@ -358,15 +358,15 @@
     alert(inp.trim() ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.") : (ZH ? "已清除 Key，将仅使用本地模型分类。刷新页面生效。" : "Key removed. The built-in local model will be used. Reload to apply."));
   };
   sw.appendChild(cfgBtn);
-  // 连接码：填了才把浏览记录交给本机的兴趣程序，留空 = 这个功能完全不存在
+  // 本地兴趣模型入口：连接后才把浏览记录交给本机程序，未连接 = 这个功能完全不存在
   const imBtn = document.createElement("button");
   imBtn.textContent = "🔗";
   const IM_STATE_TEXT = {
-    off:     [ "连接码（本机兴趣程序）：未启用。若本机兴趣程序在运行，由它发起连接即可，无需手填", "Connection code (local interest service): off. If the local service is running, let it initiate the connection — no manual entry needed" ],
-    pending: [ "连接码（本机兴趣程序）：等待连接…", "Connection code: connecting…" ],
-    ok:      [ "连接码（本机兴趣程序）：已连接", "Connection code: connected" ],
-    bad:     [ "连接码（本机兴趣程序）：连接码不对，点此重填", "Connection code: rejected — click to re-enter" ],
-    offline: [ "连接码（本机兴趣程序）：本机程序没在运行，记录已暂存", "Connection code: local service not running, events are queued" ],
+    off:     [ "本地兴趣模型：未连接。点击了解并连接", "Local interest model: not connected. Click to learn more and connect" ],
+    pending: [ "本地兴趣模型：连接中…", "Local interest model: connecting…" ],
+    ok:      [ "本地兴趣模型：已连接。点击打开仪表盘", "Local interest model: connected. Click to open the dashboard" ],
+    bad:     [ "本地兴趣模型：连接被拒绝。点击重新连接", "Local interest model: connection rejected. Click to reconnect" ],
+    offline: [ "本地兴趣模型：程序没在运行，记录已暂存", "Local interest model: program not running, events are queued" ],
   };
   function imRenderBtn(s) {
     const txt = IM_STATE_TEXT[s] || IM_STATE_TEXT.off;
@@ -377,24 +377,31 @@
   imOnState.push(imRenderBtn);
   imRenderBtn(imState);
   imBtn.onclick = () => {
-    const cur = localStorage.getItem("yfm_im_token") || "";
-    const inp = prompt(ZH
-      ? "粘贴本机兴趣程序的连接码（程序启动时会打印，也可以在 Breadcrumb 的发现页上复制）。\n\n" +
-        "填好之后，脚本会把你在 YouTube 看到和点开的视频标题、频道名、封面地址、观看时长，发到你自己电脑上的 127.0.0.1:21456，\n" +
-        "用来整理你自己的兴趣。这些内容不出这台电脑，也不会发给任何网站。\n\n" +
-        "留空并确定 = 关闭这个功能。"
-      : "Paste the connection code of the interest service running on this computer (it prints one on startup).\n\n" +
-        "Once set, this script sends titles, channel names, cover urls and watch time of videos you see and open to 127.0.0.1:21456 on your own machine,\n" +
-        "so it can build your own interest profile. Nothing leaves this computer and nothing is sent to any website.\n\n" +
-        "Leave empty to turn this off.",
-      cur);
-    if (inp === null) return;
-    localStorage.setItem("yfm_im_token", inp.trim());
-    alert(inp.trim()
-      ? (ZH ? "已保存，刷新页面生效。连接是否成功，看开关条上 🔗 的提示。"
-            : "Saved. Reload to apply; hover 🔗 on the switch bar to see whether it connected.")
-      : (ZH ? "已关闭，脚本不再把任何浏览记录发出去。刷新页面生效。"
-            : "Turned off. The script no longer reports anything. Reload to apply."));
+    if (!localStorage.getItem("yfm_im_token")) {
+      // 未连接：说明白这是什么、数据去哪，确认后跳到本机配对页，剩下的全自动
+      if (confirm(ZH
+        ? "连接你的本地兴趣模型：把你在 YouTube 看到和点开的视频（标题、频道名、封面、观看时长）记录到你自己电脑上的程序里，" +
+          "整理成只有你能看的兴趣档案。数据不出这台电脑，不发给任何网站。\n\n" +
+          "需要先在电脑上启动该程序（安装方法见 github.com/Kali-Leo/feed-mode 的 interest-model 部分）。\n\n" +
+          "已经启动了？点「确定」开始连接。"
+        : "Connect your local interest model: videos you see and open on YouTube (title, channel, cover, watch time) are recorded " +
+          "by a program on your own computer, into an interest profile only you can see. Nothing leaves this machine.\n\n" +
+          "The program must be running first (setup: github.com/Kali-Leo/feed-mode, interest-model section).\n\n" +
+          "Already running? Press OK to connect."))
+        location.href = "http://127.0.0.1:21456/pair?site=youtube";
+      return;
+    }
+    // 已连接：确定=看仪表盘；取消=走停用流程（再确认一次，防误触）
+    if (confirm(ZH
+      ? "已连接本地兴趣模型。\n\n「确定」打开兴趣仪表盘；「取消」进入停用选项。"
+      : "Connected to your local interest model.\n\nOK opens the dashboard; Cancel shows the disconnect option.")) {
+      window.open("http://127.0.0.1:21456/", "_blank");
+    } else if (confirm(ZH
+      ? "要断开并停用吗？停用后脚本不再记录任何浏览。"
+      : "Disconnect and stop recording? The script will no longer record anything.")) {
+      localStorage.removeItem("yfm_im_token");
+      alert(ZH ? "已停用，刷新页面生效。" : "Disconnected. Reload to apply.");
+    }
   };
   sw.appendChild(imBtn);
   document.body.appendChild(sw);

@@ -305,5 +305,20 @@ function seg(id, attr, cb) {
 }
 seg("ecat", "c", c => loadEmotion(c));
 seg("cwin", "d", d => loadCloud(Number(d)));
-loadEmotion("all"); loadCloud(30); loadNew(); loadPro();
+
+// 零数据时只显示连接引导，有数据后这段永不出现
+(async () => {
+  const p = await (await fetch("/profile")).json();
+  if (p.n_events > 0) { loadEmotion("all"); loadCloud(30); loadNew(); loadPro(); return; }
+  document.querySelectorAll("section.panel").forEach(s => s.remove());
+  const g = document.createElement("section");
+  g.className = "panel";
+  g.style.cssText = "text-align:center;padding:56px 24px";
+  g.innerHTML = ZH
+    ? `<p style="margin:0 0 20px">还没有数据。先连接浏览器脚本，然后正常刷视频，这里会自动累积。</p>
+       <p style="margin:0"><a href="/pair?site=bilibili">连接 B站 脚本</a>　·　<a href="/pair?site=youtube">连接 YouTube 脚本</a></p>`
+    : `<p style="margin:0 0 20px">No data yet. Connect the browser script, then browse as usual — this page fills in automatically.</p>
+       <p style="margin:0"><a href="/pair?site=bilibili">Connect Bilibili script</a>　·　<a href="/pair?site=youtube">Connect YouTube script</a></p>`;
+  document.body.appendChild(g);
+})();
 </script>

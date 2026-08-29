@@ -40,7 +40,7 @@ The gap is also visible over time in the companion interest dashboard — orange
 
 ## 🧭 Companion: your own interest model
 
-The charts above come from [`interest-model/`](interest-model/README.md), an optional local daemon that models your browsing for you, not for a platform: emotion curves of what you're fed vs what you actually open, time-windowed word clouds, newly emerging interests, and professional videos you started but never finished. All data stays on your machine; the userscripts connect to it with one click. Run `python3 interest-model/daemon/app.py`, then open `http://127.0.0.1:21456/` — details in its [README](interest-model/README.md).
+The charts above come from [`interest-model/`](interest-model/README.md), an optional local daemon that models your browsing for you, not for a platform: emotion curves of what you're fed vs what you actually open, time-windowed word clouds, newly emerging interests, and professional videos you started but never finished. All data stays on your machine; the userscripts connect with one click. Run `interest-model/start.sh` (Windows: `start.bat`) and the dashboard opens in your browser — details in its [README](interest-model/README.md).
 
 ## 📦 Install
 
