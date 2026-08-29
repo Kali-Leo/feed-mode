@@ -38,6 +38,10 @@ The gap is also visible over time in the companion interest dashboard — orange
 <img src="docs/emo_fun_en.png" width="880" alt="emotion curve in Fun mode">
 <img src="docs/emo_feelgood_en.png" width="880" alt="emotion curve in Feel-good mode">
 
+## 🧭 Companion: your own interest model
+
+The charts above come from [`interest-model/`](interest-model/README.md), an optional local daemon that models your browsing for you, not for a platform: emotion curves of what you're fed vs what you actually open, time-windowed word clouds, newly emerging interests, and professional videos you started but never finished. All data stays on your machine; the userscripts connect to it with one click. Setup in its [README](interest-model/README.md).
+
 ## 📦 Install
 
 1. Install [Violentmonkey](https://violentmonkey.github.io/) or [Tampermonkey](https://www.tampermonkey.net/)

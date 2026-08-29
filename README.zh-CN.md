@@ -40,6 +40,10 @@
 <img src="docs/emo_fun_zh.png" width="880" alt="娱乐模式下的情绪曲线">
 <img src="docs/emo_feelgood_zh.png" width="880" alt="精选娱乐模式下的情绪曲线">
 
+## 🧭 配套：你自己的兴趣模型
+
+上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把你的浏览建模给你自己看，而不是给平台看：平台投喂与你实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存在你的机器上，用户脚本一键连接。部署方式见其 [README](interest-model/README.md)。
+
 ## 📦 安装
 
 1. 安装 [Violentmonkey](https://violentmonkey.github.io/) 或 [Tampermonkey](https://www.tampermonkey.net/)
