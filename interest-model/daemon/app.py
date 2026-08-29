@@ -459,7 +459,12 @@ class H(BaseHTTPRequestHandler):
         # 配对兑换不需要令牌（本来就是为了取令牌），但必须来自白名单 Origin 且持有有效配对码
         if self.path == "/pair/exchange":
             body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-            if self.headers.get("Origin", "") not in ALLOWED_ORIGINS:
+            # 网页发起的跨源 POST 必带 Origin，白名单只对它们有意义；脚本管理器后台
+            # （GM_xmlhttpRequest，为绕开浏览器的本地网络权限门而走的通道）可能不带
+            # Origin——没有 Origin 即不是网页发的，放行；带了但不在白名单，仍然拒绝。
+            # 配对码单次有效 120 秒，始终是真正的门槛。
+            origin = self.headers.get("Origin")
+            if origin is not None and origin not in ALLOWED_ORIGINS:
                 self._json({"error": "origin not allowed"}, 403, cors=True)
                 return
             try:

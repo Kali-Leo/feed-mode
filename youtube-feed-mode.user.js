@@ -2,11 +2,13 @@
 // @name         YouTube Feed Mode: Learn / Feel-good / Fun
 // @name:zh-CN   YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      2.0.5
+// @version      2.1.0
 // @description  Filter your YouTube home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box — no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Unofficial tool, not affiliated with YouTube/Google.
 // @description:zh-CN  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
 // @run-at       document-idle
 // @license      GPL-3.0
 // @homepageURL  https://github.com/Kali-Leo/feed-mode
@@ -27,6 +29,24 @@
   // 封面地址、观看时长；不发 Cookie、不发账号、不发任何身份信息，也不发往本机以外的任何地方。
   const IM_URL = "http://127.0.0.1:21456/events";
   let IM_TOKEN = (localStorage.getItem("yfm_im_token") || "").trim();
+  // 打本机服务的统一通道。Chrome 142+ / Firefox 153+ 把「页面→本机」请求关进了本地网络
+  // 访问权限门（页面 fetch 会弹授权，http 页面甚至被静默拒绝），而脚本管理器后台发出的
+  // GM_xmlhttpRequest 走扩展身份、不在这道门的管辖内；没有 GM_xmlhttpRequest 的环境
+  // 回落到页面 fetch，浏览器若弹「访问本地网络」授权，允许一次即可。
+  function imPost(url, headers, body) {
+    if (typeof GM_xmlhttpRequest !== "function") {
+      return fetch(url, { method: "POST", headers, body, keepalive: true })
+        .then((r) => r.text().then((text) => ({ ok: r.ok, status: r.status, text })));
+    }
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "POST", url, headers, data: body, timeout: 10000,
+        onload: (r) => resolve({ ok: r.status >= 200 && r.status < 300, status: r.status, text: r.responseText }),
+        onerror: () => reject(new Error("network")),
+        ontimeout: () => reject(new Error("timeout")),
+      });
+    });
+  }
   // 一次性配对：本机程序把配对码放进 URL fragment，脚本立刻抹掉它并换取令牌。
   // 用户不必手抄任何东西；令牌仍是唯一凭证，页面上不显示、不进历史记录。
   function imPair() {
@@ -35,11 +55,10 @@
     const nonce = m[1];
     // 先抹掉地址栏里的配对码，再去兑换，避免它留在历史或被别处读到
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
-    fetch("http://127.0.0.1:21456/pair/exchange", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nonce }),
-    }).then((r) => r.ok ? r.json() : null).then((d) => {
+    imPost("http://127.0.0.1:21456/pair/exchange",
+      { "Content-Type": "application/json" },
+      JSON.stringify({ nonce }),
+    ).then((r) => { try { return r.ok ? JSON.parse(r.text) : null; } catch (e) { return null; } }).then((d) => {
       if (!d || !d.token) return;
       localStorage.setItem("yfm_im_token", d.token);
       IM_TOKEN = d.token;
@@ -71,12 +90,10 @@
     imTimer = null;
     if (!IM_TOKEN || !imQueue.length) return;
     const batch = imQueue.splice(0, 200);
-    fetch(IM_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-IM-Token": IM_TOKEN },
-      body: JSON.stringify(batch),
-      keepalive: true,
-    }).then((r) => {
+    imPost(IM_URL,
+      { "Content-Type": "application/json", "X-IM-Token": IM_TOKEN },
+      JSON.stringify(batch),
+    ).then((r) => {
       if (r.ok) { imSent += batch.length; imFails = 0; imSetState("ok"); return; }
       // 403 = 令牌失效：留着也没用，丢弃并提示
       if (r.status === 403) { imSetState("bad"); return; }
