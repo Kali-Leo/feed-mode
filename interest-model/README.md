@@ -55,4 +55,4 @@ Interests have no off-the-shelf ground truth, so evaluation uses **synthetic-use
 python3 daemon/app.py            # defaults to 127.0.0.1:21456
 ```
 
-It prints a connection code on startup; paste it into the 🔗 button on the userscript's switch bar. Data lives in `~/.interest-model/`. Open `http://127.0.0.1:21456/` for the dashboard.
+Then, in the browser where the userscript runs, open `http://127.0.0.1:21456/pair` and pick the site — the page jumps there and the script pairs itself automatically (one-time code, no copying). The dashboard is at `http://127.0.0.1:21456/`. Data lives in `~/.interest-model/`.

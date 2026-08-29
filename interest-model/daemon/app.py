@@ -385,6 +385,25 @@ class H(BaseHTTPRequestHandler):
             self._json(wordcloud(q_days(query, 30), query.get("source", ["engage"])[0]))
         elif u.path == "/pro_content":
             self._json(pro_content(q_days(query, 30)))
+        elif u.path == "/pair":
+            # 配对发起端：本机浏览器点开即现场生成一次性配对码并跳到目标站点，
+            # 脚本监听 #im-pair= 完成兑换。daemon 只绑 127.0.0.1，且码单次有效 120s。
+            site = query.get("site", [""])[0]
+            targets = {"bilibili": "https://www.bilibili.com/?p=1#im-pair=",
+                       "youtube": "https://www.youtube.com/#im-pair="}
+            if site in targets:
+                self.send_response(302)
+                self.send_header("Location", targets[site] + pair_new())
+                self.end_headers()
+            else:
+                body = ('<meta charset="utf-8"><title>连接插件 Connect</title>'
+                        '<body style="font:16px/2 system-ui;padding:40px">'
+                        '<a href="/pair?site=bilibili">连接 B站 脚本</a><br>'
+                        '<a href="/pair?site=youtube">Connect YouTube script</a>').encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(body)
         elif u.path == "/export":
             row = ST.db.execute("SELECT v FROM kv WHERE k='profile'").fetchone()
             self._json({"taxonomy_version": TAX["version"], "profile": json.loads(row[0]) if row else None})
@@ -442,6 +461,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=21456)
     args = ap.parse_args()
-    print(f"[interest-daemon] http://127.0.0.1:{args.port}/  分类器={CLF.mode}")
-    print(f"[interest-daemon] 令牌（插件里配置）: {TOKEN}")
+    print(f"[interest-daemon] 仪表盘: http://127.0.0.1:{args.port}/  分类器={CLF.mode}")
+    print(f"[interest-daemon] 连接插件: 浏览器打开 http://127.0.0.1:{args.port}/pair")
     ThreadingHTTPServer(("127.0.0.1", args.port), H).serve_forever()

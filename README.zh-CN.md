@@ -42,7 +42,7 @@
 
 ## 🧭 配套：你自己的兴趣模型
 
-上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把你的浏览建模给你自己看，而不是给平台看：平台投喂与你实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存在你的机器上，用户脚本一键连接。部署方式见其 [README](interest-model/README.md)。
+上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把你的浏览建模给你自己看，而不是给平台看：平台投喂与你实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存在你的机器上，用户脚本一键连接。运行 `python3 interest-model/daemon/app.py` 后打开 `http://127.0.0.1:21456/` 即是仪表盘，细节见其 [README](interest-model/README.md)。
 
 ## 📦 安装
 
