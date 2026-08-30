@@ -313,36 +313,51 @@ def wordcloud(days, source):
 
 
 def pro_content(days):
-    """浏览过的专业内容：看完(≥80%或观看≥10分钟) / 未看完。"""
+    """浏览过的专业内容：看完(≥80%或观看≥10分钟) / 未看完。
+
+    同一个视频按窗口内**累计**观看时长判定（脚本每次切后台就结算一段，一个视频常拆成
+    多条 watch 事件）：只看最新一条会把"看完后又点开 20 秒"记成没看过、把分段看完的
+    记成未看完（2026-08-30 审查发现）。标题等元数据取最新一条。"""
     since = time.time() - days * 86400
     rows = ST.db.execute(
         "SELECT ts, vid, title, up, dwell, dur, topic, site, pic FROM events "
         "WHERE ts>=? AND etype!='expose' ORDER BY ts DESC LIMIT 2000", (since,)).fetchall()
     fin, unfin = [], []
-    seen = set()
+    agg = {}          # key -> item（元数据来自最新事件，dwell 累计、dur 取最大）
+    order = []        # 保持"最近优先"的输出顺序
     group_of = {}
     for gname, ls in TAX["groups"].items():
         for l in ls:
             group_of[LEAVES.index(l)] = gname
     for ts, vid, title, up, dwell, dur, topic, site, pic in rows:
-        if topic not in PRO_TOPICS or (vid, title) in seen:
+        if topic not in PRO_TOPICS:
             continue
-        seen.add((vid, title))
-        item = {"ts": ts, "id": vid, "title": title, "up": up, "topic": LEAVES[topic],
-                "topic_en": TAX.get("leaves_en", {}).get(LEAVES[topic], LEAVES[topic]),
-                "group": group_of.get(topic, ""),
-                "group_en": TAX.get("groups_en", {}).get(group_of.get(topic, ""), group_of.get(topic, "")),
-                "pic": pic or "",
-                "dwell": round(dwell), "dur": round(dur),
-                "site": site}
+        key = vid or title
+        a = agg.get(key)
+        if a is None:
+            agg[key] = {"ts": ts, "id": vid, "title": title, "up": up, "topic": LEAVES[topic],
+                        "topic_en": TAX.get("leaves_en", {}).get(LEAVES[topic], LEAVES[topic]),
+                        "group": group_of.get(topic, ""),
+                        "group_en": TAX.get("groups_en", {}).get(group_of.get(topic, ""), group_of.get(topic, "")),
+                        "pic": pic or "",
+                        "dwell": dwell or 0.0, "dur": dur or 0.0,
+                        "site": site}
+            order.append(key)
+        else:
+            a["dwell"] += dwell or 0.0
+            a["dur"] = max(a["dur"], dur or 0.0)
+    for key in order:
+        item = agg[key]
+        dwell, dur = item["dwell"], item["dur"]
+        item["dwell"] = round(dwell); item["dur"] = round(dur)
         if dur > 0:
-            # 有时长信息：完成度 ≥80% 算看完；<80% 且确实看过（≥30s）算未看完
+            # 有时长信息：累计完成度 ≥80% 算看完；<80% 且确实看过（≥30s）算未看完
             if dwell / dur >= 0.8:
                 fin.append(item)
             elif dwell >= 30:
                 unfin.append(item)
         elif dwell >= 600:
-            fin.append(item)  # 无时长信息但看了10分钟以上，视为认真看过
+            fin.append(item)  # 无时长信息但累计看了10分钟以上，视为认真看过
         # 无时长且短观看：无法判断是否看完，不列入（避免"看了2/0分钟"式的误报）
     return {"days": days, "finished": fin[:100], "unfinished": unfin[:100]}
 
@@ -416,6 +431,8 @@ class H(BaseHTTPRequestHandler):
                 if rows:
                     drivers[LEAVES[t]] = [{"title": r[0], "up": r[1]} for r in rows]
             n_events = ST.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            # 主动行为（点开/观看）的条数——判断"证据够不够"该用它而不是含曝光的总数
+            n_engaged = ST.db.execute("SELECT COUNT(*) FROM events WHERE etype!='expose'").fetchone()[0]
             # 曝光纠偏：主动选择占比 / 被投喂占比。>1 = 兴趣高于投喂量，<1 = 主要是被喂的。
             # 平台推荐什么就"兴趣"什么的退化闭环，靠这一路信号才能被消费方拆开。
             lift = [round(s / max(e, 0.005), 2) for s, e in zip(d["short"], d["expose"])]
@@ -423,6 +440,7 @@ class H(BaseHTTPRequestHandler):
                         "groups": TAX["groups"], "groups_en": TAX.get("groups_en", {}), **d,
                         "lift": lift,
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
+                        "n_engaged": n_engaged,
                         "classifier": CLF.mode, "emotion_on": CLF.emo_clf is not None})
         elif u.path == "/emotion_series":
             self._json(emotion_series(q_days(query, 60), query.get("cat", ["all"])[0]))
