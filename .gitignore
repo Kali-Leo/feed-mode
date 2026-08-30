@@ -5,3 +5,7 @@ shots/
 *.xpi
 *.log
 __pycache__/
+.venv/
+dist/
+build/
+*.spec

@@ -1,0 +1,49 @@
+name: release
+
+# 打 v* 标签自动发布：Windows 一键包（PyInstaller）+ 两个用户脚本。
+# 打包参数与 interest-model/start.sh 的运行环境保持一致；改动打包方式时先在本地
+# 用相同参数构建并跑通 /profile、/pair、仪表盘三个端点再动这里。
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r interest-model/requirements.txt pyinstaller
+      - name: Build interest-model.exe
+        working-directory: interest-model
+        run: >
+          pyinstaller --noconfirm --onedir --console --name interest-model
+          --collect-data jieba
+          --collect-data sentence_transformers
+          --recursive-copy-metadata sentence-transformers
+          --add-data "daemon/dashboard.html;daemon"
+          --add-data "daemon/models;daemon/models"
+          --add-data "taxonomy.json;."
+          --add-data "emotions.json;."
+          daemon/app.py
+      - name: Zip
+        working-directory: interest-model/dist
+        run: 7z a ../../interest-model-windows.zip interest-model
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            **Userscripts** (`*.user.js`): install via [Greasy Fork](https://greasyfork.org/scripts/592929) or drop the file into Violentmonkey/Tampermonkey.
+
+            **interest-model-windows.zip**: the personal interest model as a standalone Windows app — unzip, double-click `interest-model.exe`, no Python needed. Linux/macOS: run `interest-model/start.sh` from the source tree.
+          files: |
+            interest-model-windows.zip
+            bilibili-feed-mode.user.js
+            youtube-feed-mode.user.js

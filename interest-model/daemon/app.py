@@ -7,7 +7,7 @@
      {t:标题, u:作者, type:"expose"|"click"|"watch", dwell:秒, dur:视频总长秒, id:视频id, pic:封面url, site, ts}
 仪表盘: 浏览器打开 http://127.0.0.1:<port>/
 """
-import argparse, json, os, re, secrets, sqlite3, time, threading
+import argparse, json, os, re, secrets, sqlite3, sys, time, threading
 from urllib.parse import urlparse, parse_qs
 import numpy as np
 
@@ -15,7 +15,9 @@ BASE_DIR = os.path.expanduser("~/.interest-model")
 os.makedirs(BASE_DIR, exist_ok=True)
 TOKEN_PATH = os.path.join(BASE_DIR, "token")
 DB_PATH = os.path.join(BASE_DIR, "events.db")
-HERE = os.path.dirname(os.path.abspath(__file__))
+# 打包发行版（PyInstaller）里资源在解包目录，保持 daemon/.. 的相对布局不变
+HERE = os.path.join(sys._MEIPASS, "daemon") if getattr(sys, "frozen", False) \
+    else os.path.dirname(os.path.abspath(__file__))
 TAX = json.load(open(os.path.join(HERE, "..", "taxonomy.json")))
 EMO = json.load(open(os.path.join(HERE, "..", "emotions.json")))
 LEAVES = [l for g in TAX["groups"].values() for l in g]
