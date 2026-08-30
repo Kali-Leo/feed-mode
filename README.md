@@ -18,7 +18,7 @@ English | [中文](README.zh-CN.md)
 ## ✨ Features
 
 - **Four modes**: All / Fun / Feel-good (healing, comedy, talent, pets — filters rage-bait, shock content and anxiety-mongering) / Learn (science, tech, finance, documentaries with a calm tone — clickbait "analysis" doesn't count)
-- **Built-in local model**: works offline out of the box, no API key needed
+- **Built-in local model**: works offline out of the box
 - **Optional cloud review**: add a DeepSeek API key for higher accuracy; usage and cost shown live, with a tolerance slider to control how much goes to the cloud — slide it to the end to turn the cloud off entirely and run fully offline
 - **Hands off business**: no ad blocking, no link rewriting — creator revenue is untouched
 
@@ -40,7 +40,7 @@ The gap is also visible over time in the companion interest dashboard — orange
 
 ## 🧭 Companion: your own interest model
 
-The charts above come from [`interest-model/`](interest-model/README.md), an optional local daemon that models your browsing for you, not for a platform: emotion curves of what you're fed vs what you actually open, time-windowed word clouds, newly emerging interests, and professional videos you started but never finished. All data stays on your machine; the userscripts connect with one click. Windows: grab the standalone app from [Releases](https://github.com/Kali-Leo/feed-mode/releases/latest), no Python needed. Linux/macOS: run `interest-model/start.sh`. The dashboard opens in your browser — details in its [README](interest-model/README.md).
+The charts above come from [`interest-model/`](interest-model/README.md), an optional local daemon that models your browsing for you, not for a platform: emotion curves of what you're fed vs what you actually open, time-windowed word clouds, newly emerging interests, and professional videos you started but never finished. All data stays on your machine; the userscripts connect with one click. Windows: download [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip), unzip, double-click `interest-model.exe`. Linux/macOS: run `interest-model/start.sh`. The dashboard opens in your browser — details in its [README](interest-model/README.md).
 
 ## 📦 Install
 

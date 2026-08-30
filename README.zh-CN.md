@@ -20,7 +20,7 @@
 ## ✨ 功能
 
 - **四种模式**：全部 / 娱乐 / 精选娱乐（治愈、搞笑、才艺、萌宠等正向内容，过滤引战猎奇与贩卖焦虑）/ 专业（科普、技术、财经、纪录片等，语气克制，标题党不算）
-- **内置本地模型**：装上即用，离线分类，无需任何配置
+- **内置本地模型**：装上即用，离线分类
 - **可选云端复核**：填入 DeepSeek API Key 后精度更高；用量与金额实时显示，「容忍」滑条控制云端调用比例，拉到头即完全关闭云端、纯离线运行
 - **不碰商业内容**：不屏蔽广告、不改跳转，创作者收益不受影响
 
@@ -42,7 +42,7 @@
 
 ## 🧭 配套：你自己的兴趣模型
 
-上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把你的浏览建模给你自己看，而不是给平台看：平台投喂与你实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存在你的机器上，用户脚本一键连接。Windows 直接从 [Releases](https://github.com/Kali-Leo/feed-mode/releases/latest) 下载独立程序，无需 Python；Linux/macOS 运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
+上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把你的浏览建模给你自己看，而不是给平台看：平台投喂与你实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存在你的机器上，用户脚本一键连接。Windows：下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS：运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
 
 ## 📦 安装
 

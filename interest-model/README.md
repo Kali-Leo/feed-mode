@@ -10,8 +10,8 @@ Make "your browsing interests" an object **you own**: it lives on your machine, 
 
 Requires one of the feed-mode userscripts installed.
 
-1. **Windows**: download `interest-model-windows.zip` from the [latest release](https://github.com/Kali-Leo/feed-mode/releases/latest), unzip, double-click `interest-model.exe` — no Python needed.
-   **Linux / macOS**: download the [source zip](https://github.com/Kali-Leo/feed-mode/archive/refs/heads/main.zip), unpack, and run `./start.sh` in the `interest-model` folder (needs [Python 3.10+](https://www.python.org/downloads/); the first run installs dependencies once)
+1. **Windows**: download [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip), unzip, double-click `interest-model.exe`.
+   **Linux / macOS**: install [Python 3.10+](https://www.python.org/downloads/) if you don't have it, download the [source zip](https://github.com/Kali-Leo/feed-mode/archive/refs/heads/main.zip), unpack, and run `./start.sh` in the `interest-model` folder (the first run installs dependencies once)
 2. Your browser opens the dashboard; the first run also downloads the semantic models (~600 MB, once)
 3. The dashboard shows two connect links — click your site, done
 
