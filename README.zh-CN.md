@@ -35,14 +35,14 @@
 
 **精选娱乐把负面内容（引战、猎奇、贩卖焦虑）的占比砍掉一半**，效应量 Cohen's d = 0.40。方法与原始数据见 [`research/LOG.md`](research/LOG.md)（E22）。
 
-同一差距在配套的兴趣仪表盘上随时间可见——橙线是平台投喂给你的，蓝线是你实际点开的：
+同一差距在配套的兴趣仪表盘上随时间可见——橙线是平台投喂的，蓝线是实际点开的：
 
 <img src="docs/emo_fun_zh.png" width="880" alt="娱乐模式下的情绪曲线">
 <img src="docs/emo_feelgood_zh.png" width="880" alt="精选娱乐模式下的情绪曲线">
 
-## 🧭 配套：你自己的兴趣模型
+## 🧭 配套：个人兴趣模型
 
-上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把你的浏览建模给你自己看，而不是给平台看：平台投喂与你实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存在你的机器上，用户脚本一键连接。Windows：下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS：运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
+上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把浏览建模给自己看，而不是给平台看：平台投喂与实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存本机，用户脚本一键连接。Windows：下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS：运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
 
 ## 📦 安装
 
@@ -58,7 +58,7 @@
 
 在 [platform.deepseek.com](https://platform.deepseek.com) 申请，点开关条上的 ⚙ 填入，两个站点分别设置。
 
-> 本项目完全免费，不经手任何费用。API 费用由你与 DeepSeek 直接结算，不填 Key 则零费用。
+> 本项目完全免费，不经手任何费用。API 费用自行与 DeepSeek 结算，不填 Key 则零费用。
 
 ## 🛡️ 隐私
 
