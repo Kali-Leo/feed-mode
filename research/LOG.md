@@ -387,7 +387,7 @@ LLM 调用占曝光的 28%（含冷启动重审计，稳态随模型变准下降
 - `/pro_content` 条目的 dwell 从「单次事件值」改为「窗口内累计」（44ee37c）是语义变更，按 API.md 稳定性承诺 `api_version` 1→2，本条即公告。
 - 脚本 `@grant none → GM_xmlhttpRequest` 的回退闸门仍悬置：发版前需 TM+Chrome / VM+Chrome / VM+Firefox 三组实测（移交文件验证清单第 1 条），不过即回退。
 
-**本次收尾**：API.md 补 `lift`/`n_engaged`、订正 /pair/exchange 的 Origin 规则（无 Origin 放行）；`new_interests` 按 vid 去重；events 表补 ts/topic/etype 索引；两个脚本 @description 增补本机服务说明（COMPLIANCE §4）；daemon 增加版本自检与仪表盘更新提示。
+**本次收尾**：API.md 补 `lift`/`n_engaged`、订正 /pair/exchange 的 Origin 规则（无 Origin 放行）；`new_interests` 按 vid 去重；events 表补 ts/topic/etype 索引；两个脚本 @description 增补本机服务说明（COMPLIANCE §4）；daemon 增加版本自检与仪表盘更新提示。移交清单第 5 条（配对接口矩阵）复测通过：无 Origin 兑换 200、错 Origin 403、复用 403、伪造 403、白名单+有效 200、无令牌申请 403。第 7 条以代码修复关闭（dashboard 分钟数 clamp）。剩余人工项收敛为本地验证面板，随移交文档同放 research/，不入库。
 **成本**：0。
 
 ## 预算台账（2026-08-25，DeepSeek）
