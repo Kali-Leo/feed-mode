@@ -44,7 +44,7 @@
 
 [`interest-model/`](interest-model/README.md) 是可选的本地程序，把浏览记录整理成一个仪表盘：推荐流与实际点开内容的情绪曲线、自选时间窗的词云、新出现的兴趣、开了头没看完的专业视频。数据都存在本机，用户脚本一键连接。
 
-安装：Windows 下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS 运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
+安装：Windows 下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS 运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开；首次运行注册开机自启，之后仪表盘随时可开，细节见其 [README](interest-model/README.md)。
 
 ## 📦 安装
 

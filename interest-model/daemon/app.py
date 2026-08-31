@@ -13,6 +13,11 @@ import numpy as np
 
 BASE_DIR = os.path.expanduser("~/.interest-model")
 os.makedirs(BASE_DIR, exist_ok=True)
+# 无控制台打包（--windowed）下 stdout/stderr 为 None，统一落日志文件
+if sys.stdout is None or sys.stderr is None:
+    _log = open(os.path.join(BASE_DIR, "daemon.log"), "a", buffering=1, encoding="utf-8")
+    sys.stdout = sys.stdout or _log
+    sys.stderr = sys.stderr or _log
 TOKEN_PATH = os.path.join(BASE_DIR, "token")
 DB_PATH = os.path.join(BASE_DIR, "events.db")
 # 打包发行版（PyInstaller）里资源在解包目录，保持 daemon/.. 的相对布局不变
@@ -241,9 +246,15 @@ class State:
         return {"short": nz(self.short), "long": nz(self.long), "expose": nz(self.expose)}
 
 
-print("[interest-daemon] 正在加载分类模型；首次运行需下载语义模型（约600MB），请稍候…")
-CLF = Classifier()
-ST = State()
+CLF = None
+ST = None
+
+
+def _load_models():
+    global CLF, ST
+    print("[interest-daemon] 正在加载分类模型；首次运行需下载语义模型（约600MB），请稍候…")
+    CLF = Classifier()
+    ST = State()
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -532,14 +543,120 @@ class H(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, 404, cors=True)
 
 
+# ---- 开机自启：注册后每次开机静默运行；--autostart off 移除 ----
+AUTOSTART_OFF = os.path.join(BASE_DIR, "autostart.off")
+
+
+def _launch_cmd(port):
+    cmd = [sys.executable] if getattr(sys, "frozen", False) \
+        else [sys.executable, os.path.abspath(__file__)]
+    return cmd + ["--no-browser", "--port", str(port)]
+
+
+def autostart_register(port):
+    cmd = _launch_cmd(port)
+    if sys.platform == "win32":
+        import winreg, subprocess
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(key, "interest-model", 0, winreg.REG_SZ, subprocess.list2cmdline(cmd))
+        winreg.CloseKey(key)
+    elif sys.platform == "darwin":
+        import plistlib
+        d = os.path.expanduser("~/Library/LaunchAgents")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "com.interest-model.daemon.plist"), "wb") as f:
+            plistlib.dump({"Label": "com.interest-model.daemon",
+                           "ProgramArguments": cmd, "RunAtLoad": True}, f)
+    else:
+        import shlex
+        d = os.path.expanduser("~/.config/autostart")
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, "interest-model.desktop"), "w").write(
+            "[Desktop Entry]\nType=Application\nName=interest-model\n"
+            f"Exec={shlex.join(cmd)}\nX-GNOME-Autostart-enabled=true\n")
+
+
+def autostart_remove():
+    try:
+        if sys.platform == "win32":
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                 r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
+            winreg.DeleteValue(key, "interest-model")
+            winreg.CloseKey(key)
+        elif sys.platform == "darwin":
+            os.remove(os.path.expanduser("~/Library/LaunchAgents/com.interest-model.daemon.plist"))
+        else:
+            os.remove(os.path.expanduser("~/.config/autostart/interest-model.desktop"))
+    except OSError:
+        pass
+
+
+def _already_running(port):
+    import urllib.request
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1.5)
+        return True
+    except Exception:
+        return False
+
+
+def _open_loading_page(port):
+    """先开一个本地过渡页；模型加载完、端口就绪后它自动跳进仪表盘。"""
+    import webbrowser
+    url = f"http://127.0.0.1:{port}/"
+    page = os.path.join(BASE_DIR, "loading.html")
+    open(page, "w", encoding="utf-8").write(
+        '<!doctype html><meta charset="utf-8"><title>兴趣模型启动中</title>'
+        '<body style="font-family:system-ui;display:flex;height:90vh;'
+        'align-items:center;justify-content:center;text-align:center"><div>'
+        '正在启动。首次运行会下载语义模型，约 600MB；就绪后自动进入仪表盘。'
+        f'<br><br><a href="{url}">如未自动跳转，点这里</a></div>'
+        f'<script>setInterval(()=>fetch("{url}",{{mode:"no-cors"}})'
+        f'.then(()=>location="{url}").catch(()=>0),1500)</script>')
+    webbrowser.open("file://" + page)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=21456)
     ap.add_argument("--no-browser", action="store_true", help="启动时不自动打开浏览器")
+    ap.add_argument("--autostart", choices=["on", "off"], help="注册/移除开机自启，然后退出")
     args = ap.parse_args()
+
+    if args.autostart:
+        if args.autostart == "off":
+            open(AUTOSTART_OFF, "w").close()
+            autostart_remove()
+            print("[interest-daemon] 已移除开机自启")
+        else:
+            try:
+                os.remove(AUTOSTART_OFF)
+            except OSError:
+                pass
+            autostart_register(args.port)
+            print("[interest-daemon] 已注册开机自启")
+        sys.exit(0)
+
+    if _already_running(args.port):
+        print(f"[interest-daemon] 已在运行，打开仪表盘 http://127.0.0.1:{args.port}/")
+        if not args.no_browser:
+            import webbrowser
+            webbrowser.open(f"http://127.0.0.1:{args.port}/")
+        sys.exit(0)
+
+    if not args.no_browser:
+        _open_loading_page(args.port)
+
+    if not os.path.exists(AUTOSTART_OFF):
+        try:
+            autostart_register(args.port)
+            print("[interest-daemon] 已注册开机自启，移除: --autostart off")
+        except Exception as e:
+            print("[warn] 开机自启注册失败:", str(e)[:100])
+
+    _load_models()
     print(f"[interest-daemon] 仪表盘: http://127.0.0.1:{args.port}/  分类器={CLF.mode}")
     print(f"[interest-daemon] 连接插件: 浏览器打开 http://127.0.0.1:{args.port}/pair")
-    if not args.no_browser:
-        import webbrowser
-        threading.Timer(1.0, webbrowser.open, [f"http://127.0.0.1:{args.port}/"]).start()
     ThreadingHTTPServer(("127.0.0.1", args.port), H).serve_forever()

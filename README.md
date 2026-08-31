@@ -42,7 +42,7 @@ The same gap shows up in the companion dashboard. Orange is the mean emotion of 
 
 [`interest-model/`](interest-model/README.md) is an optional local program that turns your browsing into a dashboard: emotion curves of the feed vs the videos you open, word clouds over a chosen time window, newly emerging interests, and Learn videos you started but never finished. All data stays on your machine; the userscripts connect with one click.
 
-To install: on Windows, download [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip), unzip and double-click `interest-model.exe`; on Linux/macOS, run `interest-model/start.sh`. The dashboard opens in your browser; details in its [README](interest-model/README.md).
+To install: on Windows, download [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip), unzip and double-click `interest-model.exe`; on Linux/macOS, run `interest-model/start.sh`. The dashboard opens in your browser; the first run registers autostart, so it stays available after a reboot. Details in its [README](interest-model/README.md).
 
 ## 📦 Install
 

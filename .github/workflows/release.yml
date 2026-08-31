@@ -1,8 +1,9 @@
 name: release
 
-# 打 v* 标签自动发布：Windows 一键包（PyInstaller）+ 两个用户脚本。
+# 打 v* 标签自动发布：三平台 interest-model 包（PyInstaller）+ 两个用户脚本。
 # 打包参数与 interest-model/start.sh 的运行环境保持一致；改动打包方式时先在本地
 # 用相同参数构建并跑通 /profile、/pair、仪表盘三个端点再动这里。
+# Windows 用 --windowed：配合开机自启后台运行，日志落 ~/.interest-model/daemon.log。
 on:
   push:
     tags: ["v*"]
@@ -11,8 +12,23 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            sep: ";"
+            mode: --windowed
+            asset: interest-model-windows.zip
+          - os: ubuntu-latest
+            sep: ":"
+            mode: --console
+            asset: interest-model-linux.tar.gz
+          - os: macos-latest
+            sep: ":"
+            mode: --console
+            asset: interest-model-macos.tar.gz
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,30 +36,58 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r interest-model/requirements.txt pyinstaller
-      - name: Build interest-model.exe
+      - name: Build
         working-directory: interest-model
         run: >
-          pyinstaller --noconfirm --onedir --console --name interest-model
+          pyinstaller --noconfirm --onedir ${{ matrix.mode }} --name interest-model
           --collect-data jieba
           --collect-data sentence_transformers
           --recursive-copy-metadata sentence-transformers
-          --add-data "daemon/dashboard.html;daemon"
-          --add-data "daemon/models;daemon/models"
-          --add-data "taxonomy.json;."
-          --add-data "emotions.json;."
+          --add-data "daemon/dashboard.html${{ matrix.sep }}daemon"
+          --add-data "daemon/models${{ matrix.sep }}daemon/models"
+          --add-data "taxonomy.json${{ matrix.sep }}."
+          --add-data "emotions.json${{ matrix.sep }}."
           daemon/app.py
-      - name: Zip
+      - name: Package
+        if: runner.os == 'Windows'
         working-directory: interest-model/dist
-        run: 7z a ../../interest-model-windows.zip interest-model
+        run: 7z a ../../${{ matrix.asset }} interest-model
+      - name: Package
+        if: runner.os != 'Windows'
+        working-directory: interest-model/dist
+        run: tar czf ../../${{ matrix.asset }} interest-model
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           body: |
-            **Userscripts** (`*.user.js`): install via [Greasy Fork](https://greasyfork.org/scripts/592929) or drop the file into Violentmonkey/Tampermonkey.
+            **用户脚本**：在 [Greasy Fork](https://greasyfork.org/scripts/592929) 安装，或把 `.user.js` 文件拖进 Violentmonkey / Tampermonkey。
+            **Userscripts**: install from [Greasy Fork](https://greasyfork.org/scripts/592929), or drop the `.user.js` file into Violentmonkey / Tampermonkey.
 
-            **interest-model-windows.zip**: the personal interest model as a standalone Windows app — unzip, double-click `interest-model.exe`, no Python needed. Linux/macOS: run `interest-model/start.sh` from the source tree.
+            **兴趣模型 / Interest model**
+            - Windows：下载 `interest-model-windows.zip`，解压，双击 `interest-model.exe`
+            - Linux：下载 `interest-model-linux.tar.gz`，解压，运行 `interest-model/interest-model`
+            - macOS：下载 `interest-model-macos.tar.gz`，解压，运行 `interest-model/interest-model`；首次被系统拦下时右键 → 打开
+            - Windows: unzip and double-click `interest-model.exe`. Linux/macOS: extract and run `interest-model/interest-model`; on macOS, right-click → Open if blocked on first launch.
+
+            首次运行会下载语义模型并注册开机自启，之后仪表盘在浏览器随时可开；移除自启：运行时加 `--autostart off`。
+            The first run downloads the semantic models and registers autostart; after that the dashboard is available in the browser at any time. Remove autostart by running with `--autostart off`.
           files: |
             interest-model-windows.zip
+            interest-model-linux.tar.gz
+            interest-model-macos.tar.gz
             bilibili-feed-mode.user.js
             youtube-feed-mode.user.js

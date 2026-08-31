@@ -12,8 +12,10 @@ Requires one of the feed-mode userscripts installed.
 
 1. **Windows**: download [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip), unzip, double-click `interest-model.exe`.
    **Linux / macOS**: install [Python 3.10+](https://www.python.org/downloads/) if you don't have it, download the [source zip](https://github.com/Kali-Leo/feed-mode/archive/refs/heads/main.zip), unpack, and run `./start.sh` in the `interest-model` folder (the first run installs dependencies once)
-2. Your browser opens the dashboard; the first run also downloads the semantic models (~600 MB, once)
+2. A browser page opens and turns into the dashboard once the first-run model download (~600 MB) finishes
 3. The dashboard shows two connect links — click your site, done
+
+The first run also registers the daemon to start at login, so the dashboard stays available after a reboot; launching the program while it is already running just opens the dashboard. Remove the login entry with `--autostart off`.
 
 From then on, just browse as usual and the dashboard fills in: emotion curves of what you're fed vs what you open, word clouds, emerging interests, unfinished informative videos. You can also connect or open the dashboard any time from the 🔗 button on the userscript's switch bar. Data lives in `~/.interest-model/`, and never leaves your machine.
 
@@ -62,4 +64,4 @@ Interests have no off-the-shelf ground truth, so evaluation uses **synthetic-use
 
 ## Running the daemon by hand
 
-`start.sh` / `start.bat` wrap `python3 daemon/app.py` (defaults to `127.0.0.1:21456`; `--no-browser` skips opening the dashboard). Pairing without the dashboard: open `http://127.0.0.1:21456/pair` and pick the site — a one-time code completes the handshake, nothing to copy.
+`start.sh` / `start.bat` wrap `python3 daemon/app.py` (defaults to `127.0.0.1:21456`; `--no-browser` skips opening the dashboard; `--autostart on|off` registers or removes the login entry and exits). Pairing without the dashboard: open `http://127.0.0.1:21456/pair` and pick the site — a one-time code completes the handshake, nothing to copy.
