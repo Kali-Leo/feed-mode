@@ -27,10 +27,12 @@ MODELS = [
     ("deepseek-v4-flash 非高峰", 1.58,  4.75,  0.05,  "当前默认"),
     ("deepseek-v4-flash 高峰",   3.16,  9.50,  0.10,  "UTC 1-4/6-10 价格×2"),
     ("deepseek-v4-pro 非高峰",   4.75, 14.30,  0.16,  "打标用，非线上"),
-    ("qwen-flash",              0.15,  1.50,  None,  "阿里百炼"),
-    ("qwen3.5-flash",           0.20,  2.00,  None,  "阿里百炼"),
-    ("doubao lite",             0.30,  2.40,  None,  "火山方舟"),
-    ("GLM-4.5-Flash",           0.00,  0.00,  None,  "智谱标注免费"),
+    ("qwen-flash",              0.15,  1.50,  0.03,  "阿里百炼，隐式缓存 0.03"),
+    ("doubao-seed-1.6-lite",    0.30,  0.60,  None,  "火山方舟"),
+    ("doubao-seed-2.0-mini",    0.20,  2.00,  None,  "火山方舟"),
+    ("GLM-4-FlashX-250414",     0.10,  0.10,  None,  "智谱，付费档最便宜"),
+    ("GLM-4.7-Flash",           0.00,  0.00,  None,  "智谱免费档"),
+    ("硅基流动 Qwen3-8B",        0.00,  0.00,  None,  "免费，需实名"),
 ]
 
 def cost(n, pin, pout, pcache):

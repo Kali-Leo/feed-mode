@@ -22,7 +22,7 @@ VENDORS = {
     # key: (endpoint, 默认模型, 输入元/百万, 输出元/百万)
     "deepseek":   ("https://api.deepseek.com/chat/completions", "deepseek-v4-flash", 1.58, 4.75),
     "dashscope":  ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-flash", 0.15, 1.50),
-    "zhipu":      ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.5-flash", 0.0, 0.0),
+    "zhipu":      ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7-flash", 0.0, 0.0),
     "ark":        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-lite-32k", 0.30, 2.40),
     "siliconflow": ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen3-8B", 0.0, 0.0),
 }
