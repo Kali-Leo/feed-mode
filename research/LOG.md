@@ -390,6 +390,28 @@ LLM 调用占曝光的 28%（含冷启动重审计，稳态随模型变准下降
 **本次收尾**：API.md 补 `lift`/`n_engaged`、订正 /pair/exchange 的 Origin 规则（无 Origin 放行）；`new_interests` 按 vid 去重；events 表补 ts/topic/etype 索引；两个脚本 @description 增补本机服务说明（COMPLIANCE §4）；daemon 增加版本自检与仪表盘更新提示。移交清单第 5 条（配对接口矩阵）复测通过：无 Origin 兑换 200、错 Origin 403、复用 403、伪造 403、白名单+有效 200、无令牌申请 403。第 7 条以代码修复关闭（dashboard 分钟数 clamp）。剩余人工项收敛为本地验证面板，随移交文档同放 research/，不入库。
 **成本**：0。
 
+## E26 · 2.1.0 发版验证：三组浏览器矩阵实测（2026-08-31）
+
+**方法**：Chrome for Testing 152（chromedriver 与 CDP 附加双形态）+ 系统 Firefox 登录态克隆档案，全自动驱动；Tampermonkey 5.5 / Violentmonkey 商店版。判据：开关条注入、切「专业」出卡与持续补充（DOM 计数 + CDP 网络日志）、无 412/-799、`__bfm` 沙箱可达性。截图在本地 `shots/verify-*.png`。
+
+**结果：回退闸门不触发，@grant GM_xmlhttpRequest 在三组沙箱全部成立。**
+
+| 检查 | TM+Chrome | VM+Chrome | VM+Firefox |
+|---|---|---|---|
+| 开关条注入、切专业出卡 | ✅ | ✅ | ✅ |
+| 切档后持续补充 | ✅ 卡片 71→141 | ✅ 40 次 api.bilibili.com 预取 | ✅ |
+| 无 412/-799 | ✅ | ✅ 网络日志零错误 | ✅ |
+
+- **清单第 1 条**：如上，三组全过。
+- **清单第 2 条**（Key 复核）：VM+Firefox 用登录克隆档案实测，开关条 Today 10.3ktok 实时增长。
+- **清单第 3 条**（`__bfm` 可达性）：三组沙箱下页面上下文均为 `typeof undefined`，自动化判据一律改用 UI 证据。
+- **清单第 4 条**（配对与 GM 通道）：Chrome 开启 LocalNetworkAccessChecks 后实测——302 落地 `/?p=1#im-pair`，3 秒内 hash 抹除，事件数 4→31，全程无授权弹窗。GM 通道对本地网络权限门的豁免成立，即本次 @grant 切换的全部理由。
+- **清单第 8 条**（更新提示）：VM 手动重装页完整展示 @grant 与 @connect 清单（本地截图 verify-update-new.png）；默认设置下自动更新静默完成。Greasy Fork 更新说明仍应写明权限用途（@description 已含）。
+- **途中假警报**：一度怀疑 `/?p=1` 带查询串首页不注入，复测确认是测试会话未挂扩展的操作失误，@match 无问题。
+- **自动化怪癖备案**（不影响真实用户）：TM 5.5 的安装确认流程在受控浏览器中始终不出现，改经其编辑器路径安装绕过；TM 以解包形态加载时脚本注册不跨会话持久。
+
+**成本**：0（DeepSeek 复核消耗约数分钱，走既有 Key）。
+
 ## 预算台账（2026-08-25，DeepSeek）
 
 | 项目 | 花费 |
