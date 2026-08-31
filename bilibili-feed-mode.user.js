@@ -4,7 +4,7 @@
 // @namespace    leo.bilibili.feedmode
 // @version      2.1.0
 // @description  内置本地 AI 小模型 + 大模型复核，把B站首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。可选连接你自己电脑上的兴趣模型程序（新增网络权限仅用于此，不装该程序则不发任何本机请求）。非官方工具，与哔哩哔哩无关联。
-// @description:en  Filter your Bilibili home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline out of the box - no API key needed. Add a DeepSeek key for cloud review and higher accuracy; usage and cost are shown live and a tolerance slider controls how much goes to the cloud. Free forever, never handles your money. Does not block ads. Optionally connects to the interest-model app on your own machine (the network permission is used for this alone; without the app, no local requests are made). Unofficial tool, not affiliated with Bilibili.
+// @description:en  Filter your Bilibili home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline; add a DeepSeek key for cloud review and higher accuracy, with live usage display and a tolerance slider. Does not block ads. Optionally connects to the interest-model app on your own machine; the network permission is used for this alone, and without the app no local requests are made. Unofficial tool, not affiliated with Bilibili.
 // @match        https://www.bilibili.com/
 // @match        https://www.bilibili.com/?*
 // @match        https://www.bilibili.com/video/*
