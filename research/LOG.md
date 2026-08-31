@@ -376,6 +376,20 @@ LLM 调用占曝光的 28%（含冷启动重审计，稳态随模型变准下降
 **验证**（真实页面）：滑条=100 时 35s 内 0 次 LLM 请求、产出 43 张专业卡、页面出现 unk 丢弃标记；LLM 路由模式产出 10 张专业卡从 15s+ 降至 **4.0s**，吞吐 0.64→1.66 张/s（**2.6×**）。B站请求速率升至 ~0.9/s，仍低于 E2 实测零风控的水位。
 **成本**：≈¥0.01。
 
+---
+
+## E25 · 外来改动入账与收尾（2026-08-31）
+
+**背景**：Breadcrumb 会话直接改了本仓库（5fb9dcb、44ee37c），独立审查会话逐条复核后判「整体该留，零回退令」，判决全文见 `外来改动审查移交-2026-08-30.md`。两批改动此前没有 E 编号，本条补记账并执行收尾。
+
+**要点**：
+- 5fb9dcb 的 commit message 与实际 diff 不符（描述 7 项、diff 只含 Origin 1 项，其余已由 e84d7ec 先行提交）。归属以移交文件为准，不改写历史。
+- `/pro_content` 条目的 dwell 从「单次事件值」改为「窗口内累计」（44ee37c）是语义变更，按 API.md 稳定性承诺 `api_version` 1→2，本条即公告。
+- 脚本 `@grant none → GM_xmlhttpRequest` 的回退闸门仍悬置：发版前需 TM+Chrome / VM+Chrome / VM+Firefox 三组实测（移交文件验证清单第 1 条），不过即回退。
+
+**本次收尾**：API.md 补 `lift`/`n_engaged`、订正 /pair/exchange 的 Origin 规则（无 Origin 放行）；`new_interests` 按 vid 去重；events 表补 ts/topic/etype 索引；两个脚本 @description 增补本机服务说明（COMPLIANCE §4）；daemon 增加版本自检与仪表盘更新提示。
+**成本**：0。
+
 ## 预算台账（2026-08-25，DeepSeek）
 
 | 项目 | 花费 |

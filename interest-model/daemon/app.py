@@ -33,6 +33,26 @@ PRO_GROUPS = {"科技数码", "知识学习", "财经商业", "纪实深度"}
 PRO_TOPICS = {LEAVES.index(l) for g in PRO_GROUPS for l in TAX["groups"][g]}
 ALLOWED_ORIGINS = {"https://www.bilibili.com", "https://www.youtube.com"}
 
+VERSION = "2.1.0"
+# v2：/pro_content 条目的 dwell 改为窗口内累计值（原为单次事件值），公告见 ../research/LOG.md E25
+API_VERSION = 2
+UPDATE = {"latest": None}   # 后台对比 Releases 最新 tag，仪表盘据此提示
+
+
+def _check_update():
+    import urllib.request
+    try:
+        with urllib.request.urlopen(
+                "https://api.github.com/repos/Kali-Leo/feed-mode/releases/latest", timeout=10) as r:
+            tag = json.load(r).get("tag_name", "").lstrip("v")
+
+        def key(v):
+            return [int(x) for x in re.findall(r"\d+", v)][:3]
+        if tag and key(tag) > key(VERSION):
+            UPDATE["latest"] = tag
+    except Exception:
+        pass
+
 if os.path.exists(TOKEN_PATH):
     TOKEN = open(TOKEN_PATH).read().strip()
 else:
@@ -161,6 +181,9 @@ class State:
             self.db.execute("ALTER TABLE events ADD COLUMN pic TEXT")
         except Exception:
             pass
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_events_topic ON events(topic, etype, ts)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_events_etype ON events(etype)")
         self.db.execute("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)")
         row = self.db.execute("SELECT v FROM kv WHERE k='profile'").fetchone()
         if row:
@@ -384,9 +407,10 @@ def new_interests():
     for i in range(N):
         s, l = d["short"][i], d["long"][i]
         if s >= 0.03 and s >= 2.0 * max(l, 0.005):
+            # 同一视频的 click+watch 会占两个名额，按 vid 去重、留最新一条
             rows = ST.db.execute(
-                "SELECT title, up, vid, site FROM events WHERE topic=? AND etype!='expose' "
-                "AND ts>=? ORDER BY ts DESC LIMIT 3",
+                "SELECT title, up, vid, site, MAX(ts) FROM events WHERE topic=? AND etype!='expose' "
+                "AND ts>=? GROUP BY COALESCE(NULLIF(vid,''), title) ORDER BY MAX(ts) DESC LIMIT 3",
                 (i, time.time() - 14 * 86400)).fetchall()
             out.append({"topic": LEAVES[i],
                         "topic_en": TAX.get("leaves_en", {}).get(LEAVES[i], LEAVES[i]),
@@ -447,7 +471,8 @@ class H(BaseHTTPRequestHandler):
             # 曝光纠偏：主动选择占比 / 被投喂占比。>1 = 兴趣高于投喂量，<1 = 主要是被喂的。
             # 平台推荐什么就"兴趣"什么的退化闭环，靠这一路信号才能被消费方拆开。
             lift = [round(s / max(e, 0.005), 2) for s, e in zip(d["short"], d["expose"])]
-            self._json({"api_version": 1, "topics": LEAVES, "topics_en": [TAX.get("leaves_en", {}).get(l, l) for l in LEAVES],
+            self._json({"api_version": API_VERSION, "version": VERSION, "update": UPDATE["latest"],
+                        "topics": LEAVES, "topics_en": [TAX.get("leaves_en", {}).get(l, l) for l in LEAVES],
                         "groups": TAX["groups"], "groups_en": TAX.get("groups_en", {}), **d,
                         "lift": lift,
                         "prefs": ST.prefs, "drivers": drivers, "n_events": n_events,
@@ -656,6 +681,7 @@ if __name__ == "__main__":
         except Exception as e:
             print("[warn] 开机自启注册失败:", str(e)[:100])
 
+    threading.Thread(target=_check_update, daemon=True).start()
     _load_models()
     print(f"[interest-daemon] 仪表盘: http://127.0.0.1:{args.port}/  分类器={CLF.mode}")
     print(f"[interest-daemon] 连接插件: 浏览器打开 http://127.0.0.1:{args.port}/pair")

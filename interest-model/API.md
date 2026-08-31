@@ -4,7 +4,7 @@ The daemon in `daemon/app.py` binds `127.0.0.1` only. This document is the contr
 
 ## Stability promise
 
-- Responses carry `api_version` (currently `1`).
+- Responses carry `api_version` (currently `2`; v2 since 2026-08-31 — `dwell` in `/pro_content` items is the watch time **accumulated within the window**, previously the value of a single event; announced in `../research/LOG.md` E25).
 - **Additive changes only** within a version: new fields may appear at any time; existing field names and their meaning will not change.
 - A rename or a semantic change bumps `api_version` and will be announced in `../research/LOG.md` before shipping.
 
@@ -15,7 +15,7 @@ The daemon in `daemon/app.py` binds `127.0.0.1` only. This document is the contr
 | Read endpoints (`GET`) | None, but **no CORS headers are sent**, so only same-origin (the dashboard) and native local programs can read the response. Web pages cannot. |
 | Write endpoints (`POST /events`, `POST /prefs`) | Header `X-IM-Token` must equal the token in `~/.interest-model/token`. |
 | `POST /pair/new` | Same token. Intended for local programs that can read the token file. |
-| `POST /pair/exchange` | No token, but `Origin` must be in the allowlist (`https://www.bilibili.com`, `https://www.youtube.com`) **and** the pairing code must be valid. |
+| `POST /pair/exchange` | No token. A request **without** an `Origin` header is allowed (script-manager background channels and native local programs send none); a present `Origin` must be in the allowlist (`https://www.bilibili.com`, `https://www.youtube.com`). The pairing code must be valid in every case. |
 | `GET /pair` | None (the daemon binds 127.0.0.1 only). A human-facing launcher: it lists site links, and `GET /pair?site=bilibili\|youtube` mints a code and 302-redirects to that site with `#im-pair=<nonce>`, where the script completes the exchange. Local programs should keep using `POST /pair/new`. |
 
 ## Pairing (how a browser script gets the token without the user copying it)
@@ -49,11 +49,11 @@ All return JSON. `days` defaults are per-endpoint; values are clamped to 1–365
 
 | Endpoint | Query | Returns |
 |---|---|---|
-| `GET /profile` | — | `api_version`, `topics` / `topics_en` (48 leaf names), `groups` / `groups_en`, `short` / `long` / `expose` (normalised 48-vectors), `prefs`, `drivers`, `n_events`, `classifier`, `emotion_on` |
+| `GET /profile` | — | `api_version`, `version` (daemon version), `update` (newer release tag, else `null`), `topics` / `topics_en` (48 leaf names), `groups` / `groups_en`, `short` / `long` / `expose` (normalised 48-vectors), `lift` (per-topic engage share / expose share; >1 = interest above feed volume), `prefs`, `drivers`, `n_events`, `n_engaged` (events excluding exposures), `classifier`, `emotion_on` |
 | `GET /emotion_series` | `days`, `cat` ∈ `all|pro|ent|gent` | `emotions` / `emotions_en`, `valences`, and `expose` / `engage`: arrays of `{day, valence, n, mix[]}` |
 | `GET /wordcloud` | `days`, `source` ∈ `engage|expose` | `{days, source, words: [{w, n, valence}]}` |
 | `GET /new_interests` | — | `{interests: [{topic, topic_en, share, before, items[]}]}` |
-| `GET /pro_content` | `days` | `{days, finished[], unfinished[]}`; items carry `ts, id, title, up, topic, topic_en, group, group_en, pic, dwell, dur, site` |
+| `GET /pro_content` | `days` | `{days, finished[], unfinished[]}`; items carry `ts, id, title, up, topic, topic_en, group, group_en, pic, dwell, dur, site`; `dwell` is accumulated across the window per video (api_version 2) |
 | `GET /export` | — | Full profile snapshot |
 
 Note on `cat=gent` in `/emotion_series`: it is approximated as "non-informative topics with valence ≥ 0.5". Because the filter is defined by valence, its curve is **not** independent evidence about emotional quality — do not present it as such. For a real measurement see `../research/LOG.md` E22.

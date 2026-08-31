@@ -309,6 +309,14 @@ seg("cwin", "d", d => loadCloud(Number(d)));
 // 零数据时只显示连接引导，有数据后这段永不出现
 (async () => {
   const p = await (await fetch("/profile")).json();
+  if (p.update) {
+    const u = document.createElement("div");
+    u.style.cssText = "text-align:center;font-size:13px;padding:6px 0;opacity:.75";
+    u.innerHTML = ZH
+      ? `新版本 v${p.update} 已发布：<a href="https://github.com/Kali-Leo/feed-mode/releases/latest">下载</a>`
+      : `Version ${p.update} is out: <a href="https://github.com/Kali-Leo/feed-mode/releases/latest">download</a>`;
+    document.body.prepend(u);
+  }
   if (p.n_events > 0) { loadEmotion("all"); loadCloud(30); loadNew(); loadPro(); return; }
   document.querySelectorAll("section.panel").forEach(s => s.remove());
   const g = document.createElement("section");
