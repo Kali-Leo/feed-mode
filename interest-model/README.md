@@ -11,7 +11,8 @@ Make "your browsing interests" an object **you own**: it lives on your machine, 
 Requires one of the feed-mode userscripts installed.
 
 1. **Windows**: download [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip), unzip, double-click `interest-model.exe`.
-   **Linux / macOS**: install [Python 3.10+](https://www.python.org/downloads/) if you don't have it, download the [source zip](https://github.com/Kali-Leo/feed-mode/archive/refs/heads/main.zip), unpack, and run `./start.sh` in the `interest-model` folder (the first run installs dependencies once)
+   **Linux**: download [interest-model-linux.tar.gz](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-linux.tar.gz), extract, run `interest-model/interest-model`.
+   **macOS**: download [interest-model-macos.tar.gz](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-macos.tar.gz), extract, run `interest-model/interest-model`; right-click → Open if blocked on first launch.
 2. A browser page opens and turns into the dashboard once the first-run model download (~600 MB) finishes
 3. The dashboard shows two connect links — click your site, done
 
@@ -64,4 +65,4 @@ Interests have no off-the-shelf ground truth, so evaluation uses **synthetic-use
 
 ## Running the daemon by hand
 
-`start.sh` / `start.bat` wrap `python3 daemon/app.py` (defaults to `127.0.0.1:21456`; `--no-browser` skips opening the dashboard; `--autostart on|off` registers or removes the login entry and exits). Pairing without the dashboard: open `http://127.0.0.1:21456/pair` and pick the site — a one-time code completes the handshake, nothing to copy.
+From a source checkout, `start.sh` / `start.bat` wrap `python3 daemon/app.py` and create a venv on first run (defaults to `127.0.0.1:21456`; `--no-browser` skips opening the dashboard; `--autostart on|off` registers or removes the login entry and exits). Pairing without the dashboard: open `http://127.0.0.1:21456/pair` and pick the site — a one-time code completes the handshake, nothing to copy.
