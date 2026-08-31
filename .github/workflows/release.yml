@@ -69,6 +69,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+      - name: Generate winget manifests
+        run: |
+          VER=${GITHUB_REF_NAME#v}
+          SHA=$(sha256sum interest-model-windows.zip | awk '{print $1}')
+          DIR=manifests/k/KaliLeo/InterestModel/$VER
+          mkdir -p "$DIR"
+          for f in packaging/winget/*.yaml.in; do
+            sed -e "s/{{VERSION}}/$VER/g" -e "s/{{SHA256}}/$SHA/g" "$f" > "$DIR/$(basename "${f%.in}")"
+          done
+          zip -r winget-manifests.zip manifests
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,5 +99,6 @@ jobs:
             interest-model-windows.zip
             interest-model-linux.tar.gz
             interest-model-macos.tar.gz
+            winget-manifests.zip
             bilibili-feed-mode.user.js
             youtube-feed-mode.user.js
