@@ -19,30 +19,32 @@
 
 ## ✨ 功能
 
-- **四种模式**：全部 / 娱乐 / 精选娱乐（治愈、搞笑、才艺、萌宠等正向内容，过滤引战猎奇与贩卖焦虑）/ 专业（科普、技术、财经、纪录片等，语气克制，标题党不算）
-- **内置本地模型**：装上即用，离线分类
-- **可选云端复核**：填入 DeepSeek API Key 后精度更高；用量与金额实时显示，「容忍」滑条控制云端调用比例，拉到头即完全关闭云端、纯离线运行
-- **不碰商业内容**：不屏蔽广告、不改跳转，创作者收益不受影响
+- **四种模式**：全部 / 娱乐 / 精选娱乐 / 专业。精选娱乐收治愈、搞笑、才艺、萌宠这类正向内容，滤掉引战、猎奇和贩卖焦虑；专业收科普、技术、财经、纪录片这类语气克制的内容，标题党不算。
+- **内置本地模型**：装上即用，离线分类。
+- **可选云端复核**：填入 DeepSeek API Key 后精度更高。用量与金额实时显示，「容忍」滑条控制云端调用比例，拉到头就是纯离线。
+- 只重排首页卡片，广告、跳转链接和创作者收益都保持原样。
 
-## 📊 它真的让信息流更好了吗
+## 📊 过滤效果
 
-实测，不是自称。四分类过滤器与情绪模型在不同标签上分别训练，两者一致即为独立证据。2,368 条真实视频：
+用 2,368 条视频实测：先按脚本线上同款提示词分档，再用另一套独立训练的情绪模型给每档打分。
 
 | 模式 | 视频数 | 平均情绪效价 | 负面内容占比 |
 |---|---|---|---|
 | **精选娱乐** | 1,061 | **+1.09** | **11.9%** |
 | 娱乐 | 862 | +0.70 | 24.8% |
 
-**精选娱乐把负面内容（引战、猎奇、贩卖焦虑）的占比砍掉一半**，效应量 Cohen's d = 0.40。方法与原始数据见 [`research/LOG.md`](research/LOG.md)（E22）。
+从娱乐切到精选娱乐，负面内容占比从 24.8% 降到 11.9%。完整方法与数据见 [`research/LOG.md`](research/LOG.md) 的 E22。
 
-同一差距在配套的兴趣仪表盘上随时间可见——橙线是平台投喂的，蓝线是实际点开的：
+配套的兴趣仪表盘上也能看到这个差距。橙线是推荐流的情绪均值，蓝线是实际点开视频的：
 
 <img src="docs/emo_fun_zh.png" width="880" alt="娱乐模式下的情绪曲线">
 <img src="docs/emo_feelgood_zh.png" width="880" alt="精选娱乐模式下的情绪曲线">
 
 ## 🧭 配套：个人兴趣模型
 
-上面的曲线来自 [`interest-model/`](interest-model/README.md)——可选的本地常驻服务，把浏览建模给自己看，而不是给平台看：平台投喂与实际点开的情绪曲线、自选时间窗的词云、新出现的兴趣、看了一半没看完的专业视频。全部数据只存本机，用户脚本一键连接。Windows：下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS：运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
+[`interest-model/`](interest-model/README.md) 是可选的本地程序，把浏览记录整理成一个仪表盘：推荐流与实际点开内容的情绪曲线、自选时间窗的词云、新出现的兴趣、开了头没看完的专业视频。数据都存在本机，用户脚本一键连接。
+
+安装：Windows 下载 [interest-model-windows.zip](https://github.com/Kali-Leo/feed-mode/releases/latest/download/interest-model-windows.zip) 解压，双击 `interest-model.exe`；Linux/macOS 运行 `interest-model/start.sh`。仪表盘会自动在浏览器打开，细节见其 [README](interest-model/README.md)。
 
 ## 📦 安装
 
@@ -54,17 +56,15 @@
 
 ## 🔑 API Key（可选）
 
-不填即可正常使用。填入后分类交由云端复核，「精选娱乐」这类细分判断明显更准。
+在 [platform.deepseek.com](https://platform.deepseek.com) 申请，点开关条上的 ⚙ 填入，两个站点分别设置。填入后「精选娱乐」这类细分判断明显更准。
 
-在 [platform.deepseek.com](https://platform.deepseek.com) 申请，点开关条上的 ⚙ 填入，两个站点分别设置。
-
-> 本项目完全免费，不经手任何费用。API 费用自行与 DeepSeek 结算，不填 Key 则零费用。
+脚本本身免费；API 费用由 DeepSeek 按用量计费，金额在开关条上随时可见。
 
 ## 🛡️ 隐私
 
-- 仅在填入 Key 后，向 DeepSeek 发送视频标题、作者名、标签；不发送账号、Cookie、观看历史
-- Key 与全部分类数据只存本地浏览器，无任何上报
-- B站版调用站内推荐接口预加载内容，等同于刷新首页；YouTube 版无预加载
+- 填入 Key 后，发给 DeepSeek 的内容是视频标题、作者名和标签；账号、Cookie、观看历史不会发送
+- Key 与全部分类数据只存本地浏览器
+- B站版调用站内推荐接口预加载内容，相当于多刷几次首页；YouTube 版没有预加载
 
 ## 🗂️ 仓库结构
 
@@ -72,7 +72,7 @@
 |---|---|
 | `bilibili-feed-mode.user.js` | B站用户脚本，内嵌本地分类模型 |
 | `youtube-feed-mode.user.js` | YouTube 用户脚本，内嵌本地分类模型 |
-| `interest-model/` | 可选配套：本地优先的个人兴趣模型，见其 [README](interest-model/README.md) |
+| `interest-model/` | 可选配套：个人兴趣仪表盘，见其 [README](interest-model/README.md) |
 | `research/` | 实验台账、训练管线与标注数据集，见其 [README](research/README.md) |
 
 ## ⚠️ 免责
@@ -83,4 +83,4 @@
 
 ## 📄 许可证
 
-[GPL-3.0](LICENSE) — 永久免费开源，喜欢的话点个 ⭐
+[GPL-3.0](LICENSE)，喜欢的话点个 ⭐
