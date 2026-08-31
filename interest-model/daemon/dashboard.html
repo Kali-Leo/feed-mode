@@ -278,7 +278,7 @@ function renderPro() {
       (it.pic ? `<img class="thumb" src="${esc(it.pic)}@256w_160h_1c" referrerpolicy="no-referrer" loading="lazy">` : `<div class="thumb"></div>`) +
       `<div class="body"><a class="t" ${url ? `href="${url}" target="_blank"` : ""}>${esc(it.title)}</a>` +
       `<div class="m">${esc(it.up)} · ${esc(ZH ? it.topic : (it.topic_en || it.topic))} · ${D.getMonth() + 1}.${D.getDate()}` +
-      (it.dur ? ` · ${Math.round(it.dwell / 60)}/${Math.round(it.dur / 60)} ${T.min}` : "") + `</div>` +
+      (it.dur ? ` · ${Math.round(Math.min(it.dwell, it.dur) / 60)}/${Math.round(it.dur / 60)} ${T.min}` : "") + `</div>` +
       `<div class="grow"></div><div class="prog"><i class="${pct >= 80 ? "done" : ""}" style="width:${pct}%"></i></div></div></div>`;
   }).join("");
 }
