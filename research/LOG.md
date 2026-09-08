@@ -547,6 +547,24 @@ qwen-flash 另有一次独立重跑为 acc 0.890 / F1 0.786，**同模型两次�
 
 **成本**：¥0.007（qwen-flash 两轮共约 800 条）。
 
+## E28 · 架构调查：daemon 还有没有必要（2026-09-08）
+
+**动机**：Breadcrumb 把本项目的兴趣模型整条链路移植成了 TypeScript，去掉了 Python。调查它是怎么做到的，以及本项目能否吸收。全程只读对方仓库。
+
+**它不是靠放弃语义嵌入。** Breadcrumb 用双层：A 层是 `interest_lite.js` 的逐位移植（同样的 8192 维字符 n-gram 哈希、同样的 int8 权重，parity 测试断言 288 个概率与 144 个画像值零容差相等）；B 层照样用语义嵌入 `multilingual-e5-small`，只是那 113 MB 模型是它的知识树本来就要下的，兴趣模型只额外付 32 KB 系数。**这个前提本项目不具备**，照搬「去 Python」会退化成单层。
+
+**但它顺带证明了一条对本项目价值最高的事实。** 它把分类头在 e5-small 上重训后实测与被替换的 bge-small-zh **打平**（topic top1 0.4001 / group 0.5399 / emotion 0.5075，GroupShuffleSplit 按 UP 分组）。而本项目 `app.py:102,114` 同时加载 **两个** SentenceTransformer——bge-small-zh 给 B站、paraphrase-multilingual-MiniLM 给 YouTube——外加 torch，这正是 600 MB 首次下载的来源。**一个多语言 e5-small 有可能同时顶掉两个**，配合 ONNX 运行时替掉 torch，首次下载有望降到 120-150 MB，打包体积（当前 219-341 MB）同步缩水。
+
+**浏览器端推理已被对方验证可行**：`apps/web/src/shims/embedding/embeddingWorker.ts` 用 `pipeline("feature-extraction", MODEL_ID, {dtype:"q8", device:"wasm"})`，模型存进 Cache API 跨会话复用、命中后完全离线加载，且与桌面原生向量余弦 ≥ 0.995。
+
+**daemon 的最后一个存在理由已消失**：Breadcrumb 源码中 21456 一处不剩，`interest_service.rs` 与所有启动 Python 的代码均已删除。daemon 此后只为本项目自己的仪表盘服务，而仪表盘可以由用户脚本在页面上渲染。
+
+**已修的实缺陷**：对方在移植 `profileEngine` 时标注了负 dwell 会产生负权重。回查确认 `app.py:206` 与 `interest_lite.js:74` 两侧都有，根因是 user.js 用 `Date.now()` 累计观看时长、时钟回跳使差值为负；dwell=-3600 时权重为 -55，把该内容的整个主题分布从画像里减掉且无任何报错。三处已修（两个 user.js 改单调时钟，两个消费端钳位），实测注入负 dwell 后画像负分量为 0。
+
+**尚可吸收、未做**：events 表加 `classifier` 列 + 后台重分类（嵌入模型加载失败时的历史事件目前永远是废数据）；用户脚本的持久化事件队列（当前队列纯内存，关页面即丢，403 也直接丢弃）；`UNIQUE(ts,vid,etype)` 去重索引；训练脚本的两处路径缺陷（写死 `/tmp`、读未压缩的 `corpus.jsonl` 而实际是 `.gz`）。
+
+**成本**：0。
+
 ## 预算台账（2026-08-25，DeepSeek）
 
 | 项目 | 花费 |
