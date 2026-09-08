@@ -34,7 +34,7 @@ VENDORS = {
     # Gemini 的 OpenAI 兼容端点，CORS 实测通过。免费层单价按 0 计，
     # 付费价 gemini-2.5-flash-lite $0.10/$0.40 ≈ ¥0.71/¥2.84
     "gemini":     ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                   "gemini-2.5-flash-lite", 0.0, 0.0, 2),
+                   "gemini-3.5-flash-lite", 0.0, 0.0, 2),
 }
 
 CODE = {"p": "pro", "g": "good", "e": "ent", "j": "junk", "?": "?"}

@@ -62,10 +62,11 @@
 |---|---|---|---|---|---|
 | **阿里百炼** | qwen-flash | 0.898 | 4.4s | ¥0.017 | 支付宝登录，新用户送 100 万 token |
 | DeepSeek | deepseek-v4-flash | 0.893 | **1.3s** | ¥0.073 | 需充值，工作日白天价格翻倍 |
+| Google | gemini-3.5-flash-lite | 0.883 | 1.9s | **免费层** | Google 账号，需能连上 Google |
 | 硅基流动 | Qwen3-8B | 0.858 | 7.6s | **免费** | 需实名认证 |
 | 智谱 | glm-4-flash-250414 | 0.855 | 4.7s | **免费** | 手机号注册，免实名 |
 
-准确率为 400 条冻结评测集上的实测值，评测集从未参与训练，方法与完整数据见 [`research/LOG.md`](research/LOG.md) 的 E27。qwen-flash 与 deepseek-v4-flash 准确率相当，前者便宜四倍，后者快三倍。两个免费模型比它们少找出约四分之一的专业内容，其余判断相当。
+准确率为 400 条冻结评测集上的实测值，评测集从未参与训练，方法与完整数据见 [`research/LOG.md`](research/LOG.md) 的 E27。qwen-flash、deepseek-v4-flash 与 gemini-3.5-flash-lite 三者准确率相当：qwen-flash 最便宜，deepseek 最快，gemini 找出的专业内容最多但误判也最多。另两个免费模型比它们少找出约四分之一的专业内容。
 
 ⚙ 里选中哪一家就展开哪一家的申请步骤。脚本本身免费，API 费用由各服务商按用量计费，金额在开关条上随时可见。
 

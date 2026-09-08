@@ -214,6 +214,15 @@
       note: { zh: "完全免费。条款写明不用于训练、推理后立即销毁。响应约 8 秒。",
               en: "Free. Terms state no training use and immediate deletion after inference. ~8s latency." },
     },
+    gemini: {
+      name: "Google gemini-3.5-flash-lite", free: true,
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      model: "gemini-3.5-flash-lite", price: { hit: 0, miss: 0, out: 0 },
+      apply: "https://aistudio.google.com/apikey",
+      steps: ["用 Google 账号登录", "点 Create API key，选一个项目"],
+      note: { zh: "免费层可用，找出的专业内容最多，响应约 2 秒。需自行确保能连上 Google。免费层的内容会被 Google 用于改进产品。",
+              en: "Free tier. Finds the most Learn videos, ~2s latency. Requires access to Google. Free-tier content is used to improve Google products." },
+    },
     deepseek: {
       name: "DeepSeek v4-flash", peak: true,
       url: "https://api.deepseek.com/chat/completions",

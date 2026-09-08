@@ -60,10 +60,11 @@ Click ⚙ on the switch bar to pick a provider and enter a key, separately per s
 |---|---|---|---|---|---|
 | **Alibaba** | qwen-flash | 0.898 | 4.4s | ¥0.017 | Alipay login, 1M free tokens |
 | DeepSeek | deepseek-v4-flash | 0.893 | **1.3s** | ¥0.073 | prepaid; doubles on weekday business hours |
+| Google | gemini-3.5-flash-lite | 0.883 | 1.9s | **free tier** | Google account; needs access to Google |
 | SiliconFlow | Qwen3-8B | 0.858 | 7.6s | **free** | ID verification required |
 | Zhipu | glm-4-flash-250414 | 0.855 | 4.7s | **free** | phone number only |
 
-Accuracy is measured on a frozen 400-item evaluation set that never took part in training; method and full data in [`research/LOG.md`](research/LOG.md), entry E27. qwen-flash and deepseek-v4-flash are level on accuracy; the former is four times cheaper, the latter three times faster. The two free models find about a quarter fewer Learn videos and match elsewhere.
+Accuracy is measured on a frozen 400-item evaluation set that never took part in training; method and full data in [`research/LOG.md`](research/LOG.md), entry E27. qwen-flash, deepseek-v4-flash and gemini-3.5-flash-lite are level on accuracy: qwen-flash is the cheapest, deepseek the fastest, gemini finds the most Learn videos but also mislabels the most. The other two free models find about a quarter fewer Learn videos.
 
 Selecting a provider in ⚙ expands that provider's signup steps. The script itself is free; API usage is billed by each provider at their rates, and the running total is shown on the switch bar.
 
