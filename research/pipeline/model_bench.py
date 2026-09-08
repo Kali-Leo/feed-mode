@@ -19,12 +19,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(ROOT)
 
 VENDORS = {
-    # key: (endpoint, 默认模型, 输入元/百万, 输出元/百万)
-    "deepseek":   ("https://api.deepseek.com/chat/completions", "deepseek-v4-flash", 1.58, 4.75),
-    "dashscope":  ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-flash", 0.15, 1.50),
-    "zhipu":      ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7-flash", 0.0, 0.0),
-    "ark":        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-lite-32k", 0.30, 2.40),
-    "siliconflow": ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen3-8B", 0.0, 0.0),
+    # key: (endpoint, 默认模型, 输入元/百万, 输出元/百万, 并发数)
+    # 并发数：智谱免费档的限流官方未公布（权益页只写 V0-V3「并发提升」无数字，
+    # 第三方说法在 1 与 30 之间冲突），取 1 保守跑，跑通后再往上调。
+    "deepseek":   ("https://api.deepseek.com/chat/completions", "deepseek-v4-flash", 1.58, 4.75, 3),
+    "dashscope":  ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-flash", 0.15, 1.50, 3),
+    "zhipu":      ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7-flash", 0.0, 0.0, 1),
+    "ark":        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-1.6-lite", 0.30, 0.60, 2),
+    "siliconflow": ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen3-8B", 0.0, 0.0, 1),
 }
 
 CODE = {"p": "pro", "g": "good", "e": "ent", "j": "junk", "?": "?"}
@@ -86,9 +88,10 @@ def call(endpoint, model, key, sys_prompt, batch, timeout=120):
     return res, d.get("usage", {}), time.time() - t0
 
 
-def bench(vendor, model, key, items, bs=40, workers=3):
-    endpoint, defmodel, pin, pout = VENDORS[vendor]
+def bench(vendor, model, key, items, bs=40, workers=None):
+    endpoint, defmodel, pin, pout, vworkers = VENDORS[vendor]
     model = model or defmodel
+    workers = workers or vworkers
     sys_prompt = load_prompt()
     batches = [items[i:i + bs] for i in range(0, len(items), bs)]
     preds, usage, lat, errs = {}, [], [], 0
