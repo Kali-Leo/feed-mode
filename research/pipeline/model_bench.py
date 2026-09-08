@@ -78,6 +78,10 @@ def call(endpoint, model, key, sys_prompt, batch, timeout=120):
     }
     if model.startswith("deepseek"):
         body["thinking"] = {"type": "disabled"}   # 否则思考 token 按输出计费
+    if "Qwen3" in model or "qwen3" in model:
+        # Qwen3 系列默认开思考：40 条一批时 Qwen3-8B 要 87.8s、Qwen3.5-4B 输出撞满
+        # max_tokens 导致 JSON 截断。关掉后分别降到 26.6s 与 4.9s，且 40/40 全判出。
+        body["enable_thinking"] = False
     req = urllib.request.Request(
         endpoint, data=json.dumps(body).encode(),
         headers={"content-type": "application/json", "authorization": "Bearer " + key})
