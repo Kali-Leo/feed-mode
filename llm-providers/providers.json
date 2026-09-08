@@ -1,0 +1,128 @@
+{
+  "_": "六家 OpenAI 兼容 LLM 服务商的配置与实测数据。价格单位为元/百万 token。measured 来自 feed-mode 项目的中文短文本四分类评测，400 条冻结集，方法见 research/LOG.md E27。",
+  "_updated": "2026-09-08",
+  "providers": {
+    "dashscope": {
+      "label": "阿里百炼",
+      "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "model": "qwen-flash",
+      "price": { "in": 0.15, "cache_hit": 0.03, "out": 1.5 },
+      "free_quota": "每模型 100 万 token / 90 天，仅华北2（北京）地域，领取免实名",
+      "apply": "https://bailian.console.aliyun.com/?tab=model#/api-key",
+      "cors": true,
+      "reachable_in_cn": true,
+      "trains_on_input": false,
+      "measured": { "acc": 0.898, "precision": 0.879, "recall": 0.750, "f1": 0.809, "latency_p50_s": 4.4 },
+      "quirks": [
+        "免费额度按模型快照版独立发放，qwen-flash 与 qwen-flash-2025-07-28 各算一份",
+        "未实名账号被强制开启用完即停，耗尽返回 403 AllocationQuota.FreeTierOnly，不会继续扣费",
+        "已实名账号默认关闭该保护，超额自动转按量付费"
+      ]
+    },
+    "deepseek": {
+      "label": "DeepSeek",
+      "url": "https://api.deepseek.com/chat/completions",
+      "model": "deepseek-v4-flash",
+      "price": { "in": 1.58, "cache_hit": 0.05, "out": 4.75 },
+      "free_quota": null,
+      "apply": "https://platform.deepseek.com",
+      "cors": true,
+      "reachable_in_cn": true,
+      "trains_on_input": true,
+      "measured": { "acc": 0.893, "precision": 0.884, "recall": 0.724, "f1": 0.796, "latency_p50_s": 1.3 },
+      "quirks": [
+        "必须显式传 thinking={\"type\":\"disabled\"}，否则默认开思考、reasoning token 按输出计费，成本约十倍",
+        "峰谷计价：UTC 1-4 与 6-10 点价格×2，换算北京时间为工作日 9-12 与 14-18 点",
+        "隐私政策写明可能将 API 输入输出用于模型训练，开放平台侧无关闭入口"
+      ]
+    },
+    "gemini": {
+      "label": "Google Gemini",
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "model": "gemini-3.5-flash-lite",
+      "price": { "in": 2.13, "cache_hit": null, "out": 17.75 },
+      "free_quota": "免费层可用，额度上限官方未公布",
+      "apply": "https://aistudio.google.com/apikey",
+      "cors": true,
+      "reachable_in_cn": false,
+      "trains_on_input": true,
+      "measured": { "acc": 0.883, "precision": 0.784, "recall": 0.829, "f1": 0.806, "latency_p50_s": 1.9 },
+      "quirks": [
+        "OpenAI 兼容路径是 /v1beta/openai/chat/completions，鉴权用 Authorization: Bearer；原生路径才用 ?key= 或 x-goog-api-key",
+        "gemini-2.5-flash-lite 已对新用户下线，报 404 并提示改用 gemini-3.5-flash-lite",
+        "Key 格式为 AQ. 开头，不是旧的 AIza",
+        "首次调用可能报 403 提示项目未启用 Gemini API，稍后自动生效",
+        "大陆直连不通，需代理",
+        "免费层内容会被 Google 用于改进产品，付费层不会"
+      ]
+    },
+    "zhipu": {
+      "label": "智谱",
+      "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "model": "glm-4-flash-250414",
+      "price": { "in": 0, "cache_hit": 0, "out": 0 },
+      "free_quota": "完全免费，无额度上限，注册免实名",
+      "apply": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
+      "cors": true,
+      "reachable_in_cn": true,
+      "trains_on_input": null,
+      "measured": { "acc": 0.855, "precision": 0.845, "recall": 0.612, "f1": 0.710, "latency_p50_s": 4.7 },
+      "quirks": [
+        "glm-4.7-flash 官方标注免费但实测持续返回 429 错误码 1305「该模型当前访问量过大」，连打 6 次零成功，不可用",
+        "glm-4.5-flash 已于 2026-01-30 下线，请求自动路由到 4.7",
+        "免费档并发上限官方未公布，权益页只写 V0-V3「并发提升」无数字，保守按 1 并发用",
+        "三份协议均未承诺不将输入用于训练，隐私政策写明匿名化后可用于模型训练"
+      ]
+    },
+    "siliconflow": {
+      "label": "硅基流动",
+      "url": "https://api.siliconflow.cn/v1/chat/completions",
+      "model": "Qwen/Qwen3-8B",
+      "price": { "in": 0, "cache_hit": 0, "out": 0 },
+      "free_quota": "部分模型完全免费，需实名认证",
+      "apply": "https://cloud.siliconflow.cn/account/ak",
+      "cors": true,
+      "reachable_in_cn": true,
+      "trains_on_input": false,
+      "measured": { "acc": 0.858, "precision": 0.864, "recall": 0.603, "f1": 0.711, "latency_p50_s": 7.6 },
+      "quirks": [
+        "Qwen3 系列必须传 enable_thinking=false，否则默认开思维链：40 条一批实测 88 秒且输出撞满 max_tokens 导致 JSON 截断，关掉后降到 8 秒",
+        "官方定价页当前只把 OCR、翻译、向量、语音、图像列为免费，通用对话模型是否免费未能在定价页证实",
+        "条款是六家里最严的：明文不用于训练，且推理后立即销毁"
+      ]
+    },
+    "ark": {
+      "label": "火山方舟",
+      "url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      "model": "doubao-seed-1.6-lite",
+      "price": { "in": 0.3, "cache_hit": null, "out": 0.6 },
+      "free_quota": "每模型 50 万 token，需实名",
+      "apply": "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
+      "cors": true,
+      "reachable_in_cn": true,
+      "trains_on_input": false,
+      "measured": null,
+      "quirks": [
+        "模型必须先在控制台「开通管理」逐个开通，否则一律报 404 InvalidEndpointOrModel.NotFound",
+        "GET /api/v3/models 能列出的模型不代表账号有权调用，实测列表里的 id 照样 404",
+        "未开通时无法测出任何数据"
+      ]
+    },
+    "moonshot": {
+      "label": "月之暗面 Kimi",
+      "url": "https://api.moonshot.cn/v1/chat/completions",
+      "model": "kimi-k2.6",
+      "price": { "in": 6.5, "cache_hit": null, "out": 27.0 },
+      "free_quota": null,
+      "apply": "https://platform.moonshot.cn",
+      "cors": false,
+      "reachable_in_cn": true,
+      "trains_on_input": null,
+      "measured": null,
+      "quirks": [
+        "预检返回 204 且不带任何 CORS 头，浏览器端调不通，前端项目直接排除",
+        "Tier 0 限流 RPM 3，高频调用不可用"
+      ]
+    }
+  }
+}

@@ -9,3 +9,6 @@ __pycache__/
 dist/
 build/
 *.spec
+
+# LLM 服务商密钥，仅存本机
+llm-providers/keys.env
