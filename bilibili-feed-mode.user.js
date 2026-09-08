@@ -127,10 +127,13 @@
     if (!IM_TOKEN) return;
     const bvid = (location.pathname.match(/BV[0-9A-Za-z]{10}/) || [])[0];
     if (!bvid) return;
-    let watched = 0, lastTick = Date.now(), counting = !document.hidden;
+    // 用单调时钟累计：Date.now() 会因 NTP 校时、休眠唤醒或手动改时间回跳，
+    // 差值为负会让 dwell 变负，进而在画像里产生负权重、把该主题减掉
+    const mono = () => (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now());
+    let watched = 0, lastTick = mono(), counting = !document.hidden;
     const tick = () => {
-      const now = Date.now();
-      if (counting) watched += (now - lastTick) / 1000;
+      const now = mono();
+      if (counting) watched += Math.max(0, now - lastTick) / 1000;
       lastTick = now;
     };
     setInterval(tick, 5000);

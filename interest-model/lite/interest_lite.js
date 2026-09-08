@@ -71,7 +71,9 @@
     const now = ev.ts || Date.now();
     decay(now);
     const p = proba(ev.t, ev.u);
-    const w = ev.type === "expose" ? 1 : ev.type === "click" ? 5 : 5 + Math.min((ev.dwell || 0) / 60, 10);
+    // dwell 钳到非负：客户端时钟回跳会送来负 dwell，负权重会把该主题从画像里减掉
+    const d = Math.max(0, Number(ev.dwell) || 0);
+    const w = ev.type === "expose" ? 1 : ev.type === "click" ? 5 : 5 + Math.min(d / 60, 10);
     for (let i = 0; i < 48; i++) {
       if (ev.type === "expose") S.expose[i] += p[i];
       else { S.short[i] += w * p[i]; S.long[i] += w * p[i]; }

@@ -122,10 +122,13 @@
     let watching = null;
     const watchedId = () =>
       location.pathname === "/watch" ? new URLSearchParams(location.search).get("v") : null;
+    // 用单调时钟累计：Date.now() 会因 NTP 校时、休眠唤醒或手动改时间回跳，
+    // 差值为负会让 dwell 变负，进而在画像里产生负权重、把该主题减掉
+    const mono = () => (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now());
     const tick = () => {
       if (!watching) return;
-      const now = Date.now();
-      if (watching.counting) watching.watched += (now - watching.lastTick) / 1000;
+      const now = mono();
+      if (watching.counting) watching.watched += Math.max(0, now - watching.lastTick) / 1000;
       watching.lastTick = now;
     };
     const settle = () => {
@@ -145,7 +148,7 @@
       const id = watchedId();
       if (watching && watching.id !== id) settle();
       if (id && !watching) {
-        watching = { id, watched: 0, lastTick: Date.now(), counting: !document.hidden, title: "", up: "" };
+        watching = { id, watched: 0, lastTick: mono(), counting: !document.hidden, title: "", up: "" };
       }
       if (!watching) return;
       tick();

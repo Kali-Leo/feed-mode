@@ -203,7 +203,10 @@ class State:
 
     @staticmethod
     def event_weight(etype, dwell):
-        return 1.0 if etype == "expose" else (5.0 if etype == "click" else 5.0 + min(dwell / 60.0, 10.0))
+        # dwell 钳到非负：客户端时钟回跳会送来负 dwell，直接乘进去会得到负权重，
+        # 把这条内容的整个主题分布从画像里减掉（静默污染，无任何报错）
+        d = max(0.0, dwell) if isinstance(dwell, (int, float)) else 0.0
+        return 1.0 if etype == "expose" else (5.0 if etype == "click" else 5.0 + min(d / 60.0, 10.0))
 
     def _apply(self, tp, etype, w, age):
         """把一个发生在 age 秒前的事件按"先衰减后入账"计入向量——
