@@ -1,0 +1,128 @@
+[
+ {
+  "vendor": "dashscope",
+  "model": "qwen-flash",
+  "n": 400,
+  "covered": 400,
+  "batch_errs": 0,
+  "acc": 0.89,
+  "precision": 0.9,
+  "recall": 0.6983,
+  "f1": 0.7864,
+  "tok_in": 14642,
+  "tok_out": 3074,
+  "cost_per_1k_cny": 0.01702,
+  "latency_p50_s": 3.84,
+  "class_dist": {
+   "pro": 90,
+   "good": 176,
+   "ent": 117,
+   "junk": 16,
+   "?": 1
+  }
+ },
+ {
+  "vendor": "siliconflow",
+  "model": "Qwen/Qwen3-8B",
+  "n": 200,
+  "covered": 200,
+  "batch_errs": 5,
+  "acc": 0.91,
+  "precision": 0.8723,
+  "recall": 0.7736,
+  "f1": 0.82,
+  "tok_in": 7426,
+  "tok_out": 14211,
+  "cost_per_1k_cny": 0.0,
+  "latency_p50_s": 107.17,
+  "class_dist": {
+   "pro": 47,
+   "ent": 73,
+   "junk": 11,
+   "good": 66,
+   "?": 3
+  }
+ },
+ {
+  "vendor": "zhipu",
+  "model": "glm-4-flash-250414",
+  "n": 400,
+  "covered": 400,
+  "batch_errs": 0,
+  "acc": 0.855,
+  "precision": 0.8452,
+  "recall": 0.6121,
+  "f1": 0.71,
+  "tok_in": 14138,
+  "tok_out": 1690,
+  "cost_per_1k_cny": 0.0,
+  "latency_p50_s": 4.71,
+  "class_dist": {
+   "pro": 84,
+   "good": 202,
+   "junk": 22,
+   "ent": 89,
+   "?": 3
+  }
+ },
+ {
+  "vendor": "dashscope",
+  "model": "qwen-flash",
+  "n": 400,
+  "covered": 400,
+  "batch_errs": 0,
+  "acc": 0.8975,
+  "precision": 0.8788,
+  "recall": 0.75,
+  "f1": 0.8093,
+  "tok_in": 14642,
+  "tok_out": 3199,
+  "cost_per_1k_cny": 0.01749,
+  "latency_p50_s": 4.38,
+  "class_dist": {
+   "pro": 99,
+   "good": 168,
+   "ent": 113,
+   "junk": 19,
+   "?": 1
+  }
+ },
+ {
+  "vendor": "ark",
+  "model": "doubao-lite-32k-240628",
+  "n": 0,
+  "covered": 0,
+  "batch_errs": 10,
+  "acc": 0,
+  "precision": 0.0,
+  "recall": 0.0,
+  "f1": 0.0,
+  "tok_in": 0,
+  "tok_out": 0,
+  "cost_per_1k_cny": 0.0,
+  "latency_p50_s": null,
+  "class_dist": {}
+ },
+ {
+  "vendor": "siliconflow",
+  "model": "Qwen/Qwen3-8B",
+  "n": 80,
+  "covered": 80,
+  "batch_errs": 8,
+  "acc": 0.8625,
+  "precision": 0.9048,
+  "recall": 0.6786,
+  "f1": 0.7755,
+  "tok_in": 2912,
+  "tok_out": 4894,
+  "cost_per_1k_cny": 0.0,
+  "latency_p50_s": 87.81,
+  "class_dist": {
+   "ent": 25,
+   "pro": 21,
+   "good": 27,
+   "junk": 6,
+   "?": 1
+  }
+ }
+]

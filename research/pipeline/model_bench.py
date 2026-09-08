@@ -24,8 +24,12 @@ VENDORS = {
     # 第三方说法在 1 与 30 之间冲突），取 1 保守跑，跑通后再往上调。
     "deepseek":   ("https://api.deepseek.com/chat/completions", "deepseek-v4-flash", 1.58, 4.75, 3),
     "dashscope":  ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-flash", 0.15, 1.50, 3),
-    "zhipu":      ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7-flash", 0.0, 0.0, 1),
-    "ark":        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-1.6-lite", 0.30, 0.60, 2),
+    # glm-4.7-flash 实测持续 429（错误码 1305 该模型当前访问量过大，连打 6 次 0 成功），
+    # 改用同为免费且实测可用的 glm-4-flash-250414
+    "zhipu":      ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash-250414", 0.0, 0.0, 1),
+    # seed 系列需在控制台单独开通，未开通报 InvalidEndpointOrModel.NotFound；
+    # 这个 id 取自该账号 /api/v3/models 的实际可用列表
+    "ark":        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-lite-32k-240628", 0.30, 0.60, 2),
     "siliconflow": ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen3-8B", 0.0, 0.0, 1),
 }
 
