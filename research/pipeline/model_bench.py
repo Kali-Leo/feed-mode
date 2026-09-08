@@ -31,6 +31,10 @@ VENDORS = {
     # 这个 id 取自该账号 /api/v3/models 的实际可用列表
     "ark":        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-lite-32k-240628", 0.30, 0.60, 2),
     "siliconflow": ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen3-8B", 0.0, 0.0, 1),
+    # Gemini 的 OpenAI 兼容端点，CORS 实测通过。免费层单价按 0 计，
+    # 付费价 gemini-2.5-flash-lite $0.10/$0.40 ≈ ¥0.71/¥2.84
+    "gemini":     ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                   "gemini-2.5-flash-lite", 0.0, 0.0, 2),
 }
 
 CODE = {"p": "pro", "g": "good", "e": "ent", "j": "junk", "?": "?"}
