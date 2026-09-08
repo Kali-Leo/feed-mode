@@ -167,5 +167,27 @@
    "ent": 150,
    "?": 1
   }
+ },
+ {
+  "vendor": "deepseek",
+  "model": "deepseek-v4-flash",
+  "n": 400,
+  "covered": 400,
+  "batch_errs": 0,
+  "acc": 0.8925,
+  "precision": 0.8842,
+  "recall": 0.7241,
+  "f1": 0.7962,
+  "tok_in": 13663,
+  "tok_out": 1641,
+  "cost_per_1k_cny": 0.07346,
+  "latency_p50_s": 1.34,
+  "class_dist": {
+   "pro": 95,
+   "good": 176,
+   "ent": 116,
+   "?": 6,
+   "junk": 7
+  }
  }
 ]
