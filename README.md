@@ -54,9 +54,18 @@ The interface follows your browser language (English or Chinese).
 
 ## 🔑 API Key (optional)
 
-Get a key at [platform.deepseek.com](https://platform.deepseek.com), click ⚙ on the switch bar to enter it, and set it separately per site. With a key, fine-grained calls like "Feel-good" get noticeably more accurate.
+Click ⚙ on the switch bar to pick a provider and enter a key, separately per site. With a key, fine-grained calls like "Feel-good" get noticeably more accurate.
 
-The script itself is free; API usage is billed by DeepSeek at their rates, and the running total is shown on the switch bar.
+| Provider | Model | Accuracy | Per 1k videos | Signup |
+|---|---|---|---|---|
+| **Alibaba** | qwen-flash | **0.898** | ¥0.017 | Alipay login, 1M free tokens |
+| Zhipu | glm-4-flash-250414 | 0.855 | **free** | phone number only |
+| SiliconFlow | Qwen3-8B | 0.858 | **free** | ID verification required |
+| DeepSeek | deepseek-v4-flash | pending | ¥0.10 | prepaid balance |
+
+Accuracy is measured on a frozen 400-item evaluation set that never took part in training; method and full data in [`research/LOG.md`](research/LOG.md), entry E27. The two free models find about a quarter fewer Learn videos than qwen-flash and match it elsewhere.
+
+Selecting a provider in ⚙ expands that provider's signup steps. The script itself is free; API usage is billed by each provider at their rates, and the running total is shown on the switch bar.
 
 ## 🛡️ Privacy
 

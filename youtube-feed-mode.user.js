@@ -2,9 +2,9 @@
 // @name         YouTube Feed Mode: Learn / Feel-good / Fun
 // @name:zh-CN   YouTube 首页 娱乐/专业 模式切换
 // @namespace    leo.youtube.feedmode
-// @version      2.1.0
-// @description  Filter your YouTube home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline; add a DeepSeek key for cloud review and higher accuracy, with live usage display and a tolerance slider. Does not block ads. Optionally connects to the interest-model app on your own machine; the network permission is used for this alone, and without the app no local requests are made. Unofficial tool, not affiliated with YouTube/Google.
-// @description:zh-CN  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 DeepSeek Key 后由大模型复核提升精度（用量实时显示，「容忍」滑条可控制用量，费用由你在 DeepSeek 后台自理）。本项目完全免费。不屏蔽任何广告与商业内容。可选连接你自己电脑上的兴趣模型程序（新增网络权限仅用于此，不装该程序则不发任何本机请求）。非官方工具，与 YouTube/Google 无关联。
+// @version      2.2.0
+// @description  Filter your YouTube home feed into Learn / Feel-good / Fun with one click. A built-in local AI model works offline; add a key for cloud review and higher accuracy. Pick from Alibaba, Zhipu, SiliconFlow or DeepSeek; Zhipu and SiliconFlow have fully free models. Does not block ads. Optionally connects to the interest-model app on your own machine; the network permission is used for this alone, and without the app no local requests are made. Unofficial tool, not affiliated with YouTube/Google.
+// @description:zh-CN  内置本地 AI 小模型 + 大模型复核，把 YouTube 首页推荐流分为「专业/精选娱乐/娱乐」，左下角开关一键切换。不填 API Key 也能用（本地模型离线分类）；填入 Key 后由大模型复核提升精度，可选阿里百炼、智谱、硅基流动、DeepSeek，其中智谱与硅基流动有完全免费的模型（用量实时显示，「容忍」滑条可控制用量）。本项目完全免费。不屏蔽任何广告与商业内容。可选连接你自己电脑上的兴趣模型程序（新增网络权限仅用于此，不装该程序则不发任何本机请求）。非官方工具，与 YouTube/Google 无关联。
 // @match        https://www.youtube.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      127.0.0.1
@@ -184,9 +184,53 @@
 
   // ================= 配置 =================
   // API Key 通过左下角开关条上的 ⚙ 设置，仅存于你浏览器的 localStorage（youtube.com 域下）
+  // 服务商清单。准确率与延迟为 400 条 held-out 实测（research/LOG.md E27），
+  // 价目为元/百万 token；free 表示该模型不计费。
+  const PROVIDERS = {
+    qwen: {
+      name: "阿里百炼 qwen-flash",
+      url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+      model: "qwen-flash", price: { hit: 0.03, miss: 0.15, out: 1.5 },
+      apply: "https://bailian.console.aliyun.com/?tab=model#/api-key",
+      steps: ["用支付宝或淘宝账号登录", "首次进入点「开通百炼」，地域选华北2（北京）", "点「创建我的 API-KEY」"],
+      note: { zh: "新用户送 100 万 token，90 天有效。四家里准确率最高，响应 4 秒。",
+              en: "1M free tokens for 90 days. Highest measured accuracy, 4s latency." },
+    },
+    zhipu: {
+      name: "智谱 GLM-4-Flash", free: true,
+      url: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      model: "glm-4-flash-250414", price: { hit: 0, miss: 0, out: 0 },
+      apply: "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
+      steps: ["用手机号注册", "点「添加新的 API Key」"],
+      note: { zh: "完全免费，注册免实名。专业卡比 qwen-flash 少约四分之一。",
+              en: "Free, phone signup only. Finds about a quarter fewer Learn videos than qwen-flash." },
+    },
+    siliconflow: {
+      name: "硅基流动 Qwen3-8B", free: true,
+      url: "https://api.siliconflow.cn/v1/chat/completions",
+      model: "Qwen/Qwen3-8B", price: { hit: 0, miss: 0, out: 0 },
+      apply: "https://cloud.siliconflow.cn/account/ak",
+      steps: ["注册并完成实名认证", "点「新建 API 密钥」"],
+      note: { zh: "完全免费。条款写明不用于训练、推理后立即销毁。响应约 8 秒。",
+              en: "Free. Terms state no training use and immediate deletion after inference. ~8s latency." },
+    },
+    deepseek: {
+      name: "DeepSeek v4-flash", peak: true,
+      url: "https://api.deepseek.com/chat/completions",
+      model: "deepseek-v4-flash", price: { hit: 0.05, miss: 1.58, out: 4.75 },
+      apply: "https://platform.deepseek.com",
+      steps: ["注册并充值", "在 API keys 页创建密钥"],
+      note: { zh: "比 qwen-flash 贵约 5 倍，工作日 9-12 点与 14-18 点价格翻倍。",
+              en: "About 5x the cost of qwen-flash; doubles on weekday business hours." },
+    },
+  };
   const API_KEY = (localStorage.getItem("yfm_api_key") || "").trim();
-  const API_URL = localStorage.getItem("yfm_api_url") || "https://api.deepseek.com/chat/completions";
-  const MODEL = localStorage.getItem("yfm_model") || "deepseek-v4-flash"; // 旧名 deepseek-chat 已于 2026-07 退役
+  // 迁移：已填过 Key 但没选过服务商的老用户留在 DeepSeek，
+  // 否则换默认值会把他们的 DeepSeek 密钥发给另一家。新用户默认 qwen。
+  const PROV_ID = localStorage.getItem("yfm_provider") || (API_KEY ? "deepseek" : "qwen");
+  const PROV = PROVIDERS[PROV_ID] || PROVIDERS.qwen;
+  const API_URL = localStorage.getItem("yfm_api_url") || PROV.url;
+  const MODEL = localStorage.getItem("yfm_model") || PROV.model;
   const BATCH_SIZE = 40; // 批量越大，system prompt 摊得越薄
   const BATCH_WAIT_MS = 300;
   // ========================================
@@ -358,22 +402,86 @@
   const cfgBtn = document.createElement("button");
   cfgBtn.textContent = "⚙";
   cfgBtn.title = ZH ? "设置 API Key（用于 LLM 智能分类）" : "Set API key for AI classification";
-  cfgBtn.onclick = () => {
-    const cur = localStorage.getItem("yfm_api_key") || "";
-    const inp = prompt(ZH
-      ? "输入你自己的 DeepSeek API Key（在 platform.deepseek.com 申请，用量与费用由你在 DeepSeek 后台自理，本脚本免费且不经手任何费用）。\n" +
-        "留空并确定 = 不用云端，仅由内置本地模型分类。\n\n" +
-        "隐私说明：启用后，仅视频的「标题、频道名」会发送给 DeepSeek 用于分类；\n" +
-        "不会发送你的账号信息、Cookie 或观看历史。Key 仅保存在你自己的浏览器中。"
-      : "Enter your DeepSeek API key (get one at platform.deepseek.com; usage is billed by DeepSeek to you — this script is free and never handles money).\n" +
-        "Leave empty to skip the cloud and classify with the built-in local model only.\n\n" +
-        "Privacy: only video titles and channel names are sent to DeepSeek for classification;\n" +
-        "never your account, cookies or watch history. The key stays in your browser.",
-      cur);
-    if (inp === null) return;
-    localStorage.setItem("yfm_api_key", inp.trim());
-    alert(inp.trim() ? (ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.") : (ZH ? "已清除 Key，将仅使用本地模型分类。刷新页面生效。" : "Key removed. The built-in local model will be used. Reload to apply."));
-  };
+  cfgBtn.onclick = () => openCfg();
+
+  // 服务商选择 + Key 设置。选中哪家就展开哪家的申请步骤，避免一次铺开四份说明
+  function openCfg() {
+    const old = document.getElementById("yfm-cfg");
+    if (old) old.remove();
+    let picked = PROV_ID;
+    const mask = document.createElement("div");
+    mask.id = "yfm-cfg";
+    mask.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);" +
+      "display:flex;align-items:center;justify-content:center;font:13px/1.6 system-ui,sans-serif";
+    const box = document.createElement("div");
+    box.style.cssText = "background:#fff;color:#18191c;border-radius:8px;padding:18px 20px;" +
+      "width:min(520px,92vw);max-height:86vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)";
+    mask.appendChild(box);
+
+    const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    function render() {
+      const p = PROVIDERS[picked];
+      const rows = Object.keys(PROVIDERS).map(id => {
+        const v = PROVIDERS[id];
+        const tag = v.free ? (ZH ? "免费" : "free")
+          : id === "qwen" ? (ZH ? "约 ¥0.02/千条" : "~¥0.02/1k")
+          : (ZH ? "约 ¥0.10/千条" : "~¥0.10/1k");
+        return `<label style="display:flex;gap:8px;align-items:baseline;padding:6px 0;cursor:pointer">
+          <input type="radio" name="yfmprov" value="${id}"${id === picked ? " checked" : ""} style="margin:0">
+          <span style="flex:1"><b>${esc(v.name)}</b>
+            <span style="color:#9499a0;font-size:12px;margin-left:6px">${tag}</span></span></label>`;
+      }).join("");
+      box.innerHTML = `
+        <div style="font-weight:600;font-size:15px;margin-bottom:2px">${ZH ? "AI 分类设置" : "AI classification"}</div>
+        <div style="color:#61666d;font-size:12px;margin-bottom:12px">${ZH
+          ? "本地模型免费离线可用。填 Key 后由云端复核，「精选娱乐」这类细分判断更准。"
+          : "The local model works offline for free. A key adds cloud review for finer calls."}</div>
+        ${rows}
+        <div style="background:#f6f7f8;border-radius:6px;padding:10px 12px;margin:10px 0">
+          <div style="margin-bottom:6px">${esc(ZH ? p.note.zh : p.note.en)}</div>
+          <div style="font-size:12px;color:#61666d">${ZH ? "申请步骤" : "How to get a key"}：
+            ${p.steps.map((s, i) => `${i + 1}. ${esc(s)}`).join("　")}</div>
+          <a href="${esc(p.apply)}" target="_blank" rel="noopener"
+             style="display:inline-block;margin-top:8px;color:#ff0000">${ZH ? "打开申请页" : "Open key page"} →</a>
+        </div>
+        <input id="yfm-cfg-key" type="text" spellcheck="false" placeholder="${ZH ? "粘贴 API Key" : "Paste API key"}"
+          style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e3e5e7;border-radius:5px;
+                 font:12px ui-monospace,Menlo,Consolas,monospace">
+        <div style="color:#9499a0;font-size:12px;margin:8px 0 12px">${ZH
+          ? "Key 只存在你自己的浏览器里。发送的内容是视频标题、UP主名、标签，不含账号、Cookie 与观看历史。"
+          : "The key stays in your browser. Only titles, uploader names and tags are sent."}</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="yfm-cfg-clear" style="padding:6px 12px;border:1px solid #e3e5e7;background:#fff;border-radius:5px;cursor:pointer">${ZH ? "清除 Key" : "Remove key"}</button>
+          <button id="yfm-cfg-cancel" style="padding:6px 12px;border:1px solid #e3e5e7;background:#fff;border-radius:5px;cursor:pointer">${ZH ? "取消" : "Cancel"}</button>
+          <button id="yfm-cfg-save" style="padding:6px 14px;border:0;background:#ff0000;color:#fff;border-radius:5px;cursor:pointer">${ZH ? "保存" : "Save"}</button>
+        </div>`;
+      box.querySelector("#yfm-cfg-key").value = localStorage.getItem("yfm_api_key") || "";
+      box.querySelectorAll('input[name="yfmprov"]').forEach(r =>
+        r.addEventListener("change", () => { picked = r.value; render(); }));
+      box.querySelector("#yfm-cfg-cancel").onclick = () => mask.remove();
+      box.querySelector("#yfm-cfg-clear").onclick = () => {
+        localStorage.removeItem("yfm_api_key");
+        mask.remove();
+        alert(ZH ? "已清除 Key。本地模型仍支撑「专业」模式，刷新页面生效。"
+                 : "Key removed. The local model still powers Learn mode. Reload to apply.");
+      };
+      box.querySelector("#yfm-cfg-save").onclick = () => {
+        const k = box.querySelector("#yfm-cfg-key").value.trim();
+        localStorage.setItem("yfm_provider", picked);
+        // 换服务商必须同时清掉手工覆盖，否则会把新 Key 发到旧地址
+        localStorage.removeItem("yfm_api_url");
+        localStorage.removeItem("yfm_model");
+        if (k) localStorage.setItem("yfm_api_key", k); else localStorage.removeItem("yfm_api_key");
+        if (picked !== PROV_ID) { tok.c = tok.dC = 0; localStorage.setItem("yfm_tok", JSON.stringify(tok)); }
+        mask.remove();
+        alert(ZH ? "已保存，刷新页面生效。" : "Saved. Reload the page to apply.");
+      };
+    }
+    render();
+    mask.addEventListener("click", e => { if (e.target === mask) mask.remove(); });
+    document.body.appendChild(mask);
+  }
+
   sw.appendChild(cfgBtn);
   // 本地兴趣模型入口：连接后才把浏览记录交给本机程序，未连接 = 这个功能完全不存在
   const imBtn = document.createElement("button");
@@ -425,8 +533,13 @@
 
   // ---------- token 计量（纯观测，不干预请求）：逐请求累计 API 返回的 usage，精确值非估算 ----------
   // deepseek-v4-flash 价目（元/百万token，≈美元价×7.2）；高峰时段（UTC 1-4 与 6-10 点）价格×2
-  const PRICE = { hit: 0.05, miss: 1.58, out: 4.75 };
-  const priceFactor = () => { const h = new Date().getUTCHours(); return (h >= 1 && h < 4) || (h >= 6 && h < 10) ? 2 : 1; };
+  // 价目取自当前服务商（元/百万token）。仅 DeepSeek 有峰谷加价：UTC 1-4 与 6-10 点价格×2
+  const PRICE = PROV.price;
+  const priceFactor = () => {
+    if (!PROV.peak) return 1;
+    const h = new Date().getUTCHours();
+    return (h >= 1 && h < 4) || (h >= 6 && h < 10) ? 2 : 1;
+  };
   const tok = load("yfm_tok", { in: 0, hit: 0, out: 0, req: 0, c: 0, day: "", dIn: 0, dHit: 0, dOut: 0, dC: 0 });
   const tokDayStr = () => { const t = new Date(); return t.getFullYear() + "-" + (t.getMonth() + 1) + "-" + t.getDate(); };
   const tokRoll = () => { const d = tokDayStr(); if (tok.day !== d) { tok.day = d; tok.dIn = tok.dHit = tok.dOut = 0; tok.dC = 0; } };
@@ -536,6 +649,9 @@
             model: MODEL, max_tokens: 500,
             // v4-flash 默认开思考模式，reasoning token 按输出计费，分类任务必须显式关闭
             ...(MODEL.startsWith("deepseek") ? { thinking: { type: "disabled" } } : {}),
+            // Qwen3 系列同样默认开思考：实测 40 条一批要 88 秒且输出撞满 max_tokens
+            // 导致 JSON 截断，关掉后降到 8 秒（research/LOG.md E27）
+            ...(/qwen3/i.test(MODEL) ? { enable_thinking: false } : {}),
             response_format: { type: "json_object" },
             messages: [
               { role: "system", content: SYSTEM_PROMPT },
