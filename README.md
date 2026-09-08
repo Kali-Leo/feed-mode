@@ -19,7 +19,7 @@ English | [中文](README.zh-CN.md)
 
 - **Four modes**: All / Fun / Feel-good / Learn. Feel-good keeps healing, comedy, talent and pet content and filters out rage-bait, shock content and anxiety-mongering; Learn covers science, tech, finance and documentaries with a calm tone, so clickbait "analysis" doesn't count.
 - **Built-in local model**: works offline out of the box.
-- **Optional cloud review**: add a DeepSeek API key for higher accuracy. Usage and cost are shown live; the tolerance slider controls how much goes to the cloud, and at the far end everything runs offline.
+- **Optional cloud review**: add an API key for higher accuracy. Pick among four providers, two of which have fully free models. Usage and cost are shown live; the tolerance slider controls how much goes to the cloud, and at the far end everything runs offline.
 - Only reorders the homepage cards; ads, links and creator revenue stay as they are.
 
 ## 📊 Results
@@ -69,7 +69,7 @@ Selecting a provider in ⚙ expands that provider's signup steps. The script its
 
 ## 🛡️ Privacy
 
-- With a key set, what goes to DeepSeek is the video title, author name and tags; your account, cookies and watch history are never sent
+- With a key set, what goes to the provider you picked is the video title, author name and tags; your account, cookies and watch history are never sent
 - The key and all classification data stay in your local browser
 - The Bilibili script prefetches content through the site's own recommendation API, which amounts to refreshing the homepage a few extra times; the YouTube script does no prefetching
 
