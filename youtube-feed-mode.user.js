@@ -193,8 +193,8 @@
       model: "qwen-flash", price: { hit: 0.03, miss: 0.15, out: 1.5 },
       apply: "https://bailian.console.aliyun.com/?tab=model#/api-key",
       steps: ["用支付宝或淘宝账号登录", "首次进入点「开通百炼」，地域选华北2（北京）", "点「创建我的 API-KEY」"],
-      note: { zh: "新用户送 100 万 token，90 天有效。四家里准确率最高，响应 4 秒。",
-              en: "1M free tokens for 90 days. Highest measured accuracy, 4s latency." },
+      note: { zh: "新用户送 100 万 token，90 天有效。准确率与 DeepSeek、Gemini 相当，其中最便宜。",
+              en: "1M free tokens for 90 days. Level with DeepSeek and Gemini on accuracy, and the cheapest of the three." },
     },
     zhipu: {
       name: "智谱 GLM-4-Flash", free: true,
@@ -229,8 +229,8 @@
       model: "deepseek-v4-flash", price: { hit: 0.05, miss: 1.58, out: 4.75 },
       apply: "https://platform.deepseek.com",
       steps: ["注册并充值", "在 API keys 页创建密钥"],
-      note: { zh: "比 qwen-flash 贵约 5 倍，工作日 9-12 点与 14-18 点价格翻倍。",
-              en: "About 5x the cost of qwen-flash; doubles on weekday business hours." },
+      note: { zh: "响应最快，约 1.3 秒。比 qwen-flash 贵约 4 倍，工作日 9-12 与 14-18 点价格翻倍。",
+              en: "Fastest at ~1.3s. About 4x the cost of qwen-flash; doubles on weekday business hours." },
     },
   };
   const API_KEY = (localStorage.getItem("yfm_api_key") || "").trim();
@@ -428,6 +428,32 @@
     mask.appendChild(box);
 
     const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    // 连通探测：拿无效 Key 发一次最小请求，能收到任何 HTTP 响应即说明这家可达；
+    // 抛异常说明被墙或被 CORS 拦，用户选了也用不了。结果缓存一天。
+    const probe = load("yfm_probe", { at: 0, r: {} });
+    const probeFresh = Date.now() - (probe.at || 0) < 864e5;
+    let status = probeFresh ? probe.r : {};
+    async function runProbes() {
+      const out = {};
+      await Promise.all(Object.keys(PROVIDERS).map(async id => {
+        const v = PROVIDERS[id];
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 8000);
+        try {
+          await fetch(v.url, {
+            method: "POST", signal: ac.signal,
+            headers: { "content-type": "application/json", "authorization": "Bearer probe" },
+            body: JSON.stringify({ model: v.model, max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
+          });
+          out[id] = "ok";           // 401/400 也算通：说明网络到得了
+        } catch (e) {
+          out[id] = "blocked";
+        } finally { clearTimeout(t); }
+      }));
+      status = out;
+      localStorage.setItem("yfm_probe", JSON.stringify({ at: Date.now(), r: out }));
+      render();
+    }
     function render() {
       const p = PROVIDERS[picked];
       const rows = Object.keys(PROVIDERS).map(id => {
@@ -435,10 +461,17 @@
         const tag = v.free ? (ZH ? "免费" : "free")
           : id === "qwen" ? (ZH ? "约 ¥0.02/千条" : "~¥0.02/1k")
           : (ZH ? "约 ¥0.10/千条" : "~¥0.10/1k");
-        return `<label style="display:flex;gap:8px;align-items:baseline;padding:6px 0;cursor:pointer">
-          <input type="radio" name="yfmprov" value="${id}"${id === picked ? " checked" : ""} style="margin:0">
+        const st = status[id];
+        const bad = st === "blocked";
+        const mark = st === "ok" ? `<span style="color:#18a058;font-size:12px">${ZH ? "可用" : "reachable"}</span>`
+          : bad ? `<span style="color:#d03050;font-size:12px">${ZH ? "连不上" : "unreachable"}</span>`
+          : `<span style="color:#9499a0;font-size:12px">${ZH ? "检测中" : "checking"}</span>`;
+        return `<label style="display:flex;gap:8px;align-items:baseline;padding:6px 0;
+                 cursor:${bad ? "not-allowed" : "pointer"};opacity:${bad ? ".5" : "1"}">
+          <input type="radio" name="yfmprov" value="${id}"${id === picked ? " checked" : ""}${bad ? " disabled" : ""} style="margin:0">
           <span style="flex:1"><b>${esc(v.name)}</b>
-            <span style="color:#9499a0;font-size:12px;margin-left:6px">${tag}</span></span></label>`;
+            <span style="color:#9499a0;font-size:12px;margin-left:6px">${tag}</span></span>
+          ${mark}</label>`;
       }).join("");
       box.innerHTML = `
         <div style="font-weight:600;font-size:15px;margin-bottom:2px">${ZH ? "AI 分类设置" : "AI classification"}</div>
@@ -459,7 +492,10 @@
         <div style="color:#9499a0;font-size:12px;margin:8px 0 12px">${ZH
           ? "Key 只存在你自己的浏览器里。发送的内容是视频标题、UP主名、标签，不含账号、Cookie 与观看历史。"
           : "The key stays in your browser. Only titles, uploader names and tags are sent."}</div>
+        ${status[picked] === "blocked" ? `<div style="color:#d03050;font-size:12px;margin:-4px 0 10px">${ZH
+          ? "当前这家连不上，选一个标为可用的。" : "The selected provider is unreachable. Pick one marked reachable."}</div>` : ""}
         <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="yfm-cfg-retest" style="margin-right:auto;padding:6px 12px;border:1px solid #e3e5e7;background:#fff;border-radius:5px;cursor:pointer">${ZH ? "重测连通" : "Re-test"}</button>
           <button id="yfm-cfg-clear" style="padding:6px 12px;border:1px solid #e3e5e7;background:#fff;border-radius:5px;cursor:pointer">${ZH ? "清除 Key" : "Remove key"}</button>
           <button id="yfm-cfg-cancel" style="padding:6px 12px;border:1px solid #e3e5e7;background:#fff;border-radius:5px;cursor:pointer">${ZH ? "取消" : "Cancel"}</button>
           <button id="yfm-cfg-save" style="padding:6px 14px;border:0;background:#ff0000;color:#fff;border-radius:5px;cursor:pointer">${ZH ? "保存" : "Save"}</button>
@@ -468,6 +504,7 @@
       box.querySelectorAll('input[name="yfmprov"]').forEach(r =>
         r.addEventListener("change", () => { picked = r.value; render(); }));
       box.querySelector("#yfm-cfg-cancel").onclick = () => mask.remove();
+      box.querySelector("#yfm-cfg-retest").onclick = () => { status = {}; render(); runProbes(); };
       box.querySelector("#yfm-cfg-clear").onclick = () => {
         localStorage.removeItem("yfm_api_key");
         mask.remove();
@@ -487,6 +524,7 @@
       };
     }
     render();
+    if (!probeFresh) runProbes();
     mask.addEventListener("click", e => { if (e.target === mask) mask.remove(); });
     document.body.appendChild(mask);
   }
