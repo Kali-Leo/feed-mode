@@ -1,0 +1,11 @@
+{
+ "n": 400,
+ "covered": 400,
+ "topic_top1": 0.3975,
+ "topic_group": 0.595,
+ "emotion_top1": 0.5,
+ "tok_in_per_item": 42.8,
+ "tok_out_per_item": 7.6,
+ "cost_per_1k_cny": 0.01777,
+ "latency_p50_s": 2.11
+}
