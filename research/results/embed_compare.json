@@ -1,0 +1,54 @@
+[
+ {
+  "key": "bge",
+  "model": "BAAI/bge-small-zh-v1.5",
+  "note": "当前 B站侧",
+  "dims": 512,
+  "cache_mb": 91.9,
+  "load_s": 13.2,
+  "encode_ms_per_item": 0.2,
+  "acc": 0.7872,
+  "precision": 0.5967,
+  "recall": 0.8049,
+  "f1": 0.6853
+ },
+ {
+  "key": "minilm",
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "note": "当前 YouTube 侧",
+  "dims": 384,
+  "cache_mb": 457.5,
+  "load_s": 13.3,
+  "encode_ms_per_item": 0.34,
+  "acc": 0.7488,
+  "precision": 0.5473,
+  "recall": 0.7372,
+  "f1": 0.6282
+ },
+ {
+  "key": "e5",
+  "model": "intfloat/multilingual-e5-small",
+  "note": "Breadcrumb 所用",
+  "dims": 384,
+  "cache_mb": 470.4,
+  "load_s": 38.2,
+  "encode_ms_per_item": 0.37,
+  "acc": 0.7949,
+  "precision": 0.6125,
+  "recall": 0.7823,
+  "f1": 0.6871
+ },
+ {
+  "key": "granite",
+  "model": "ibm-granite/granite-embedding-107m-multilingual",
+  "note": "MTEB 100M 以下领先",
+  "dims": 384,
+  "cache_mb": 218.2,
+  "load_s": 33.2,
+  "encode_ms_per_item": 0.09,
+  "acc": 0.7571,
+  "precision": 0.5631,
+  "recall": 0.6961,
+  "f1": 0.6226
+ }
+]
