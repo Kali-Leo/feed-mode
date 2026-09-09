@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>e5-small 浏览器推理基准</title>
+<pre id="log">启动…</pre>
+<script type="module">
+const log = (s) => { document.getElementById("log").textContent += "\n" + s; console.log(s); };
+window.__done = null;
+
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
+
+env.allowLocalModels = false;
+env.remoteHost = "https://huggingface.co";
+
+const TITLES = await (await fetch("./titles.json")).json();
+const MODEL = "Xenova/multilingual-e5-small";
+
+async function bench(device, dtype) {
+  const t0 = performance.now();
+  let extractor;
+  try {
+    extractor = await pipeline("feature-extraction", MODEL, { dtype, device });
+  } catch (e) {
+    return { device, dtype, error: String(e).slice(0, 200) };
+  }
+  const loadMs = performance.now() - t0;
+
+  // 预热，排除首次编译
+  await extractor(["query: 预热"], { pooling: "mean", normalize: true });
+
+  const runs = [];
+  for (const bs of [1, 8, 32]) {
+    const batch = TITLES.slice(0, bs).map(t => "query: " + t);
+    if (batch.length !== bs) throw new Error("语料不足 " + bs);
+    const t1 = performance.now();
+    const reps = bs === 1 ? 20 : 5;
+    for (let i = 0; i < reps; i++) {
+      await extractor(batch, { pooling: "mean", normalize: true });
+    }
+    const total = performance.now() - t1;
+    runs.push({ batch: bs, n_real: batch.length, ms_per_item: +(total / (reps * bs)).toFixed(2),
+                ms_per_call: +(total / reps).toFixed(1) });
+  }
+  // 正确性校验：不同文本必须得到不同向量，且模长为 1；否则说明推理是空转
+  const a = await extractor(["query: 量子力学入门讲解"], { pooling: "mean", normalize: true });
+  const b = await extractor(["query: 猫咪搞笑合集"], { pooling: "mean", normalize: true });
+  const va = Array.from(a.data), vb = Array.from(b.data);
+  const dot = va.reduce((s, x, i) => s + x * vb[i], 0);
+  const norm = Math.sqrt(va.reduce((s, x) => s + x * x, 0));
+  return { device, dtype, load_ms: Math.round(loadMs), dims: a.dims, runs,
+           sanity: { cos_diff_texts: +dot.toFixed(4), norm: +norm.toFixed(4),
+                     first3: va.slice(0, 3).map(x => +x.toFixed(4)) } };
+}
+
+(async () => {
+  const results = [];
+  for (const [device, dtype] of [["wasm", "q8"], ["webgpu", "q8"], ["webgpu", "fp16"]]) {
+    log(`跑 ${device}/${dtype} …`);
+    const r = await bench(device, dtype);
+    results.push(r);
+    log(JSON.stringify(r));
+  }
+  window.__done = results;
+  log("完成");
+})();
+</script>
