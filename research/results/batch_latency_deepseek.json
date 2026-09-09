@@ -1,0 +1,34 @@
+[
+ {
+  "batch": 5,
+  "wait_s": 0.77,
+  "ms_per_item": 153.8,
+  "cost_per_1k": 0.19929,
+  "tok_in_per_item": 111.7,
+  "covered": 20
+ },
+ {
+  "batch": 10,
+  "wait_s": 0.77,
+  "ms_per_item": 76.8,
+  "cost_per_1k": 0.12617,
+  "tok_in_per_item": 66.6,
+  "covered": 40
+ },
+ {
+  "batch": 20,
+  "wait_s": 1.21,
+  "ms_per_item": 60.7,
+  "cost_per_1k": 0.09044,
+  "tok_in_per_item": 44.6,
+  "covered": 80
+ },
+ {
+  "batch": 40,
+  "wait_s": 1.59,
+  "ms_per_item": 39.7,
+  "cost_per_1k": 0.07318,
+  "tok_in_per_item": 34.0,
+  "covered": 160
+ }
+]

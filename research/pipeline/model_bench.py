@@ -146,7 +146,7 @@ def bench(vendor, model, key, items, bs=40, workers=None):
     for c in preds.values():
         dist[c] = dist.get(c, 0) + 1
     return {
-        "vendor": vendor, "model": model, "n": n, "covered": len(preds), "batch_errs": errs,
+        "vendor": vendor, "model": model, "bs": bs, "n": n, "covered": len(preds), "batch_errs": errs,
         "acc": round((tp + tn) / n, 4) if n else 0, "precision": round(prec, 4),
         "recall": round(rec, 4), "f1": round(f1, 4),
         "tok_in": tin, "tok_out": tout, "cost_per_1k_cny": round(cost1k, 5),
@@ -160,6 +160,7 @@ if __name__ == "__main__":
     ap.add_argument("--vendors", required=True, help="逗号分隔，见 VENDORS")
     ap.add_argument("--model", default=None, help="覆盖默认模型 id（只在单厂商时用）")
     ap.add_argument("--n", type=int, default=400)
+    ap.add_argument("--bs", type=int, default=40)
     ap.add_argument("--out", default=os.path.join(ROOT, "results", "model_bench.json"))
     args = ap.parse_args()
 
@@ -173,7 +174,7 @@ if __name__ == "__main__":
             print(f"跳过 {v}：未设 BENCH_KEY_{v}")
             continue
         print(f"跑 {v} …")
-        r = bench(v, args.model, key, items)
+        r = bench(v, args.model, key, items, bs=args.bs)
         out.append(r)
         print("  " + json.dumps(r, ensure_ascii=False))
     if out:

@@ -243,7 +243,10 @@
   const PROV = PROVIDERS[PROV_ID] || PROVIDERS.qwen;
   const API_URL = localStorage.getItem("yfm_api_url") || PROV.url;
   const MODEL = localStorage.getItem("yfm_model") || PROV.model;
-  const BATCH_SIZE = 40; // 批量越大，system prompt 摊得越薄
+  // 批量 10 而非 40：E32 实测同一批 400 条，两者准确率同为 0.8925、F1 差 0.2 个点在噪声内，
+  // 但一批的等待从 3.16s 降到 0.93s，代价只是每千条成本 +15%。批量大只省 system prompt，
+  // 而它命中前缀缓存后本就便宜；延迟才是用户看得见的。
+  const BATCH_SIZE = 10;
   const BATCH_WAIT_MS = 300;
   // ========================================
 
